@@ -24,9 +24,13 @@ pub const DAY_SECONDS: u64 = 3600 * 24;
 pub const IP_BLOCK_DUR: u64 = 60;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub(crate) struct PeerInfo {
-    #[serde(default)]
     pub(crate) ip: String,
+    #[serde(alias = "hostname", alias = "device_name", alias = "deviceName")]
+    pub(crate) device_name: String,
+    #[serde(alias = "user", alias = "username", alias = "userName")]
+    pub(crate) username: String,
 }
 
 pub(crate) struct Peer {
@@ -58,6 +62,17 @@ impl Default for Peer {
 }
 
 pub(crate) type LockPeer = Arc<RwLock<Peer>>;
+
+#[derive(Clone)]
+pub(crate) struct PeerSnapshot {
+    pub(crate) id: String,
+    pub(crate) guid: Vec<u8>,
+    pub(crate) uuid: Vec<u8>,
+    pub(crate) pk: Vec<u8>,
+    pub(crate) info: PeerInfo,
+    pub(crate) socket_addr: SocketAddr,
+    pub(crate) seconds_since_last_registration: u64,
+}
 
 #[derive(Clone)]
 pub(crate) struct PeerMap {
@@ -176,5 +191,47 @@ impl PeerMap {
     #[inline]
     pub(crate) async fn is_in_memory(&self, id: &str) -> bool {
         self.map.read().await.contains_key(id)
+    }
+
+    pub(crate) async fn snapshot_all(&self) -> Vec<PeerSnapshot> {
+        let peers: Vec<(String, LockPeer)> = {
+            let guard = self.map.read().await;
+            guard
+                .iter()
+                .map(|(id, peer)| (id.clone(), peer.clone()))
+                .collect()
+        };
+        let mut snapshots = Vec::with_capacity(peers.len());
+        for (id, peer) in peers {
+            let peer_guard = peer.read().await;
+            snapshots.push(PeerSnapshot {
+                id,
+                guid: peer_guard.guid.clone(),
+                uuid: peer_guard.uuid.to_vec(),
+                pk: peer_guard.pk.to_vec(),
+                info: peer_guard.info.clone(),
+                socket_addr: peer_guard.socket_addr,
+                seconds_since_last_registration: peer_guard.last_reg_time.elapsed().as_secs(),
+            });
+        }
+        snapshots
+    }
+
+    pub(crate) async fn snapshot_for(&self, id: &str) -> Option<PeerSnapshot> {
+        let peer = self.get_in_memory(id).await?;
+        let peer_guard = peer.read().await;
+        Some(PeerSnapshot {
+            id: id.to_owned(),
+            guid: peer_guard.guid.clone(),
+            uuid: peer_guard.uuid.to_vec(),
+            pk: peer_guard.pk.to_vec(),
+            info: peer_guard.info.clone(),
+            socket_addr: peer_guard.socket_addr,
+            seconds_since_last_registration: peer_guard.last_reg_time.elapsed().as_secs(),
+        })
+    }
+
+    pub(crate) async fn disconnect(&self, id: &str) -> bool {
+        self.map.write().await.remove(id).is_some()
     }
 }
