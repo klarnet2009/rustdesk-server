@@ -1,5 +1,6 @@
 use crate::common::*;
 use crate::peer::*;
+use crate::web;
 use hbb_common::{
     allow_err, bail,
     bytes::{Bytes, BytesMut},
@@ -96,6 +97,10 @@ impl RendezvousServer {
         let nat_port = port - 1;
         let ws_port = port + 2;
         let pm = PeerMap::new().await?;
+        std::env::set_var("PORT_FOR_API", port.to_string());
+        if let Err(err) = web::api::spawn_api_server(pm.clone()).await {
+            log::error!("Failed to start HTTP API server: {}", err);
+        }
         log::info!("serial={}", serial);
         let rendezvous_servers = get_servers(&get_arg("rendezvous-servers"), "rendezvous-servers");
         log::info!("Listening on tcp/udp :{}", port);
@@ -137,7 +142,6 @@ impl RendezvousServer {
         };
         log::info!("mask: {:?}", rs.inner.mask);
         log::info!("local-ip: {:?}", rs.inner.local_ip);
-        std::env::set_var("PORT_FOR_API", port.to_string());
         rs.parse_relay_servers(&get_arg("relay-servers"));
         let mut listener = create_tcp_listener(port).await?;
         let mut listener2 = create_tcp_listener(nat_port).await?;
