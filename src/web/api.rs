@@ -6,16 +6,16 @@ use std::{
 };
 
 use axum::{
-    extract::{Form, Path, State, TypedHeader},
+    extract::{Extension, Form, Path, TypedHeader},
     headers::Cookie,
     http::{header, HeaderValue, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
-    Json, Router,
+    AddExtensionLayer, Json, Router, Server,
 };
 use chrono::{Duration as ChronoDuration, Utc};
 use hbb_common::{log, tokio, ResultType};
-use ldap3::{drive, LdapConnAsync, Scope, SearchEntry};
+use ldap3::{LdapConnAsync, Scope, SearchEntry};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -161,7 +161,7 @@ impl LdapConfig {
         let (conn, mut ldap) = LdapConnAsync::new(&self.url)
             .await
             .map_err(|err| AuthError::Connection(err.to_string()))?;
-        drive!(conn);
+        ldap3::drive!(conn);
 
         if let Some(bind_dn) = &self.bind_dn {
             let response = ldap
@@ -356,13 +356,14 @@ pub(crate) async fn spawn_api_server(peer_map: PeerMap) -> ResultType<()> {
         log::info!("Web UI cookies marked as Secure");
     }
     let router = build_router(state);
-    let listener = tokio::net::TcpListener::bind(addr).await?;
     let shutdown = async {
         if let Err(err) = crate::common::listen_signal().await {
             log::error!("HTTP API shutdown listener error: {}", err);
         }
     };
-    let server = axum::serve(listener, router.into_make_service()).with_graceful_shutdown(shutdown);
+    let server = Server::try_bind(&addr)?
+        .serve(router.into_make_service())
+        .with_graceful_shutdown(shutdown);
     tokio::spawn(async move {
         if let Err(err) = server.await {
             log::error!("HTTP API server error: {}", err);
@@ -416,10 +417,13 @@ fn build_router(state: AppState) -> Router {
             "/api/connections/:id/disconnect",
             post(disconnect_connection),
         )
-        .with_state(state)
+        .layer(AddExtensionLayer::new(state))
 }
 
-async fn root(State(state): State<AppState>, cookies: Option<TypedHeader<Cookie>>) -> Response {
+async fn root(
+    Extension(state): Extension<AppState>,
+    cookies: Option<TypedHeader<Cookie>>,
+) -> Response {
     if extract_session(&state, cookies).await.is_some() {
         Redirect::to("/dashboard").into_response()
     } else {
@@ -428,7 +432,7 @@ async fn root(State(state): State<AppState>, cookies: Option<TypedHeader<Cookie>
 }
 
 async fn login_page(
-    State(state): State<AppState>,
+    Extension(state): Extension<AppState>,
     cookies: Option<TypedHeader<Cookie>>,
 ) -> Response {
     if extract_session(&state, cookies).await.is_some() {
@@ -438,7 +442,10 @@ async fn login_page(
     }
 }
 
-async fn process_login(State(state): State<AppState>, Form(form): Form<LoginForm>) -> Response {
+async fn process_login(
+    Extension(state): Extension<AppState>,
+    Form(form): Form<LoginForm>,
+) -> Response {
     let LoginForm { username, password } = form;
     let username_trimmed = username.trim().to_owned();
 
@@ -482,7 +489,7 @@ async fn process_login(State(state): State<AppState>, Form(form): Form<LoginForm
 }
 
 async fn dashboard(
-    State(state): State<AppState>,
+    Extension(state): Extension<AppState>,
     cookies: Option<TypedHeader<Cookie>>,
 ) -> Response {
     match extract_session(&state, cookies).await {
@@ -501,7 +508,10 @@ async fn dashboard(
     }
 }
 
-async fn logout(State(state): State<AppState>, cookies: Option<TypedHeader<Cookie>>) -> Response {
+async fn logout(
+    Extension(state): Extension<AppState>,
+    cookies: Option<TypedHeader<Cookie>>,
+) -> Response {
     if let Some((session_id, _)) = extract_session(&state, cookies).await {
         state.sessions.remove(&session_id).await;
     }
@@ -515,7 +525,9 @@ async fn logout(State(state): State<AppState>, cookies: Option<TypedHeader<Cooki
     response
 }
 
-async fn list_connections(State(state): State<AppState>) -> Json<Vec<ConnectionSummary>> {
+async fn list_connections(
+    Extension(state): Extension<AppState>,
+) -> Json<Vec<ConnectionSummary>> {
     let items = state
         .peer_map
         .snapshot_all()
@@ -527,7 +539,7 @@ async fn list_connections(State(state): State<AppState>) -> Json<Vec<ConnectionS
 }
 async fn get_connection(
     Path(id): Path<String>,
-    State(state): State<AppState>,
+    Extension(state): Extension<AppState>,
 ) -> Result<Json<ConnectionDetail>, (StatusCode, Json<ApiError>)> {
     match state.peer_map.snapshot_for(&id).await {
         Some(snapshot) => Ok(Json(ConnectionDetail::from(snapshot))),
@@ -537,7 +549,7 @@ async fn get_connection(
 
 async fn disconnect_connection(
     Path(id): Path<String>,
-    State(state): State<AppState>,
+    Extension(state): Extension<AppState>,
 ) -> impl IntoResponse {
     if state.peer_map.disconnect(&id).await {
         StatusCode::NO_CONTENT.into_response()
