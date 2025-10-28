@@ -24,9 +24,13 @@ pub const DAY_SECONDS: u64 = 3600 * 24;
 pub const IP_BLOCK_DUR: u64 = 60;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub(crate) struct PeerInfo {
-    #[serde(default)]
     pub(crate) ip: String,
+    #[serde(alias = "hostname", alias = "device_name", alias = "deviceName")]
+    pub(crate) device_name: String,
+    #[serde(alias = "user", alias = "username", alias = "userName")]
+    pub(crate) username: String,
 }
 
 pub(crate) struct Peer {
