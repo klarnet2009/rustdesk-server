@@ -322,8 +322,12 @@ impl RendezvousServer {
                 Some(rendezvous_message::Union::RegisterPeer(rp)) => {
                     // B registered
                     if !rp.id.is_empty() {
-                        log::trace!("New peer registered: {:?} {:?}", &rp.id, &addr);
-                        self.update_addr(rp.id, addr, socket).await?;
+                        log::trace!("New peer registered: {:?} {:?} hostname={:?}", &rp.id, &addr, &rp.hostname);
+                        self.update_addr(rp.id.clone(), addr, socket).await?;
+                        // Save hostname to hostname_map for lookup
+                        if !rp.hostname.is_empty() {
+                            self.pm.update_hostname(&rp.id, &rp.hostname).await;
+                        }
                         if self.inner.serial > rp.serial {
                             let mut msg_out = RendezvousMessage::new();
                             msg_out.set_configure_update(ConfigUpdate {
@@ -468,6 +472,17 @@ impl RendezvousServer {
                         });
                         socket.send(&msg_out, addr).await?;
                     }
+                }
+                Some(rendezvous_message::Union::LookupHostnameRequest(req)) => {
+                    // Lookup peer IDs by hostname
+                    let ids = self.pm.get_by_hostname(&req.hostname).await;
+                    let mut msg_out = RendezvousMessage::new();
+                    msg_out.set_lookup_hostname_response(LookupHostnameResponse {
+                        ids,
+                        ..Default::default()
+                    });
+                    socket.send(&msg_out, addr).await?;
+                    log::debug!("Hostname lookup: '{}' -> {:?}", req.hostname, msg_out.lookup_hostname_response().ids);
                 }
                 _ => {}
             }
