@@ -43,6 +43,7 @@ pub(crate) struct Peer {
     pub(crate) info: PeerInfo,
     // pub(crate) disabled: bool,
     pub(crate) reg_pk: (u32, Instant), // how often register_pk
+    pub(crate) hostname: String,
 }
 
 impl Default for Peer {
@@ -57,6 +58,7 @@ impl Default for Peer {
             // user: None,
             // disabled: false,
             reg_pk: (0, get_expired_time()),
+            hostname: String::new(),
         }
     }
 }
@@ -77,6 +79,7 @@ pub(crate) struct PeerSnapshot {
 #[derive(Clone)]
 pub(crate) struct PeerMap {
     map: Arc<RwLock<HashMap<String, LockPeer>>>,
+    hostname_map: Arc<RwLock<HashMap<String, HashSet<String>>>>,
     pub(crate) db: database::Database,
 }
 
@@ -99,9 +102,55 @@ impl PeerMap {
         log::info!("DB_URL={}", db);
         let pm = Self {
             map: Default::default(),
+            hostname_map: Default::default(),
             db: database::Database::new(&db).await?,
         };
         Ok(pm)
+    }
+
+    /// Update hostname for a peer and maintain the hostname_map index
+    #[inline]
+    pub(crate) async fn update_hostname(&self, id: &str, hostname: &str) {
+        let hostname = hostname.to_lowercase();
+        if hostname.is_empty() {
+            return;
+        }
+        // Update peer's hostname field
+        if let Some(peer) = self.map.read().await.get(id) {
+            let old_hostname = {
+                let r = peer.read().await;
+                r.hostname.clone()
+            };
+            // Remove from old hostname mapping if changed
+            if !old_hostname.is_empty() && old_hostname != hostname {
+                let mut hm = self.hostname_map.write().await;
+                if let Some(ids) = hm.get_mut(&old_hostname) {
+                    ids.remove(id);
+                    if ids.is_empty() {
+                        hm.remove(&old_hostname);
+                    }
+                }
+            }
+            peer.write().await.hostname = hostname.clone();
+        }
+        // Add to hostname_map
+        self.hostname_map.write().await
+            .entry(hostname)
+            .or_insert_with(HashSet::new)
+            .insert(id.to_owned());
+    }
+
+    /// Resolve a hostname to peer IDs
+    #[inline]
+    pub(crate) async fn get_by_hostname(&self, hostname: &str) -> Option<String> {
+        let hostname = hostname.to_lowercase();
+        let hm = self.hostname_map.read().await;
+        if let Some(ids) = hm.get(&hostname) {
+            // Return the first (most recent) ID if any exist
+            ids.iter().next().cloned()
+        } else {
+            None
+        }
     }
 
 

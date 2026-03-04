@@ -322,8 +322,12 @@ impl RendezvousServer {
                 Some(rendezvous_message::Union::RegisterPeer(rp)) => {
                     // B registered
                     if !rp.id.is_empty() {
-                        log::trace!("New peer registered: {:?} {:?}", &rp.id, &addr);
+                        log::trace!("New peer registered: {:?} {:?} hostname={:?}", &rp.id, &addr, &rp.hostname);
                         self.update_addr(rp.id.clone(), addr, socket).await?;
+                        // Track hostname for transparent resolution
+                        if !rp.hostname.is_empty() {
+                            self.pm.update_hostname(&rp.id, &rp.hostname).await;
+                        }
                         if self.inner.serial > rp.serial {
                             let mut msg_out = RendezvousMessage::new();
                             msg_out.set_configure_update(ConfigUpdate {
@@ -693,6 +697,18 @@ impl RendezvousServer {
             return Ok((msg_out, None));
         }
         let id = ph.id;
+        // Transparent hostname resolution: if the requested ID doesn't exist
+        // as a direct peer, try resolving it as a hostname
+        let id = if self.pm.get(&id).await.is_none() {
+            if let Some(resolved) = self.pm.get_by_hostname(&id).await {
+                log::info!("Hostname '{}' resolved to peer ID '{}'", id, resolved);
+                resolved
+            } else {
+                id
+            }
+        } else {
+            id
+        };
         // punch hole request from A, relay to B,
         // check if in same intranet first,
         // fetch local addrs if in same intranet.
