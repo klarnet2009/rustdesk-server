@@ -7,13 +7,15 @@ networks:
 services:
   hbbs:
     container_name: hbbs
+    build:
+      context: .
+      dockerfile: Dockerfile.build
     ports:
       - 21115:21115
       - 21116:21116
       - 21116:21116/udp
       - 21118:21118
-    image: rustdesk/rustdesk-server:latest
-    command: hbbs -r rustdesk.example.com:21117
+    command: hbbs -r hbbr:21117
     volumes:
       - ./data:/root
     networks:
@@ -24,13 +26,34 @@ services:
 
   hbbr:
     container_name: hbbr
+    build:
+      context: .
+      dockerfile: Dockerfile.build
     ports:
       - 21117:21117
       - 21119:21119
-    image: rustdesk/rustdesk-server:latest
     command: hbbr
     volumes:
       - ./data:/root
     networks:
       - rustdesk-net
+    restart: unless-stopped
+
+  web-panel:
+    container_name: rustdesk-web-panel
+    build:
+      context: ../rustdesk/web_panel
+      dockerfile: Dockerfile
+    ports:
+      - 21114:21114
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=21114
+      - SSL_ENABLED=false
+    volumes:
+      - ./data/web_panel:/app/data
+    networks:
+      - rustdesk-net
+    depends_on:
+      - hbbs
     restart: unless-stopped
