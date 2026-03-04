@@ -43,7 +43,6 @@ pub(crate) struct Peer {
     pub(crate) info: PeerInfo,
     // pub(crate) disabled: bool,
     pub(crate) reg_pk: (u32, Instant), // how often register_pk
-    pub(crate) hostname: String, // PC hostname for lookup
 }
 
 impl Default for Peer {
@@ -58,7 +57,6 @@ impl Default for Peer {
             // user: None,
             // disabled: false,
             reg_pk: (0, get_expired_time()),
-            hostname: String::new(),
         }
     }
 }
@@ -79,7 +77,6 @@ pub(crate) struct PeerSnapshot {
 #[derive(Clone)]
 pub(crate) struct PeerMap {
     map: Arc<RwLock<HashMap<String, LockPeer>>>,
-    hostname_map: Arc<RwLock<HashMap<String, HashSet<String>>>>, // hostname -> [id1, id2, ...]
     pub(crate) db: database::Database,
 }
 
@@ -102,57 +99,11 @@ impl PeerMap {
         log::info!("DB_URL={}", db);
         let pm = Self {
             map: Default::default(),
-            hostname_map: Default::default(),
             db: database::Database::new(&db).await?,
         };
         Ok(pm)
     }
 
-    /// Update hostname for a peer and update the hostname_map
-    #[inline]
-    pub(crate) async fn update_hostname(&self, id: &str, hostname: &str) {
-        let hostname = hostname.to_lowercase();
-        if hostname.is_empty() {
-            return;
-        }
-        
-        // Update peer's hostname
-        if let Some(peer) = self.map.read().await.get(id) {
-            let old_hostname = {
-                let r = peer.read().await;
-                r.hostname.clone()
-            };
-            
-            // Remove from old hostname mapping if changed
-            if !old_hostname.is_empty() && old_hostname != hostname {
-                let mut hm = self.hostname_map.write().await;
-                if let Some(ids) = hm.get_mut(&old_hostname) {
-                    ids.remove(id);
-                    if ids.is_empty() {
-                        hm.remove(&old_hostname);
-                    }
-                }
-            }
-            
-            peer.write().await.hostname = hostname.clone();
-        }
-        
-        // Add to hostname_map
-        let mut hm = self.hostname_map.write().await;
-        hm.entry(hostname).or_insert_with(HashSet::new).insert(id.to_owned());
-        log::debug!("Updated hostname mapping: {} -> {}", id, id);
-    }
-
-    /// Get peer IDs by hostname
-    #[inline]
-    pub(crate) async fn get_by_hostname(&self, hostname: &str) -> Vec<String> {
-        let hostname = hostname.to_lowercase();
-        if let Some(ids) = self.hostname_map.read().await.get(&hostname) {
-            ids.iter().cloned().collect()
-        } else {
-            Vec::new()
-        }
-    }
 
     #[inline]
     pub(crate) async fn update_pk(
