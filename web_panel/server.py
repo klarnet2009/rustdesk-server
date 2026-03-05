@@ -17,6 +17,7 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # LDAP Module
 try:
@@ -30,6 +31,7 @@ except ImportError:
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'rustdesk-web-panel-secret-key-2024')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Enable CORS for API endpoints
 CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
