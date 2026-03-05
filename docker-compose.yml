@@ -57,6 +57,10 @@ services:
     networks:
       - rustdesk-net
       - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.http.services.rustdesk-web-panel.loadbalancer.server.port=21114"
     depends_on:
       - hbbs
     restart: unless-stopped
