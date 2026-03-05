@@ -11,7 +11,7 @@ services:
     container_name: hbbs
     build:
       context: .
-      dockerfile: Dockerfile.build
+      dockerfile: Dockerfile
     ports:
       - "21115:21115"
       - "21116:21116"
@@ -30,7 +30,7 @@ services:
     container_name: hbbr
     build:
       context: .
-      dockerfile: Dockerfile.build
+      dockerfile: Dockerfile
     ports:
       - "21117:21117"
     command: hbbr
