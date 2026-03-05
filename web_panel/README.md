@@ -1,0 +1,190 @@
+# 🖥️ RustDesk Web Management Panel
+
+Веб-панель для управления устройствами RustDesk.
+
+## 🚀 Возможности
+
+### Через API можно получить:
+
+| Данные | Endpoint | Описание |
+|--------|----------|----------|
+| **Список устройств** | `/api/admin/devices` | ID, hostname, OS, username, version, online status |
+| **Статус онлайн** | `/api/heartbeat` | Устройства отправляют heartbeat каждые 15 сек |
+| **Информация о системе** | `/api/sysinfo` | CPU, RAM, OS версия, hostname |
+| **Аудит подключений** | `/api/audit/*` | Кто, когда, к кому подключался |
+| **Адресная книга** | `/api/ab/get` | Список сохранённых контактов пользователя |
+
+### Веб-панель показывает:
+
+- 📱 **Все устройства** с ID, hostname, OS, статусом
+- 🟢 **Онлайн/оффлайн** статус в реальном времени
+- 🔗 **Кнопка подключения** - открывает RustDesk через URI
+- 📊 **Статистика** - всего устройств, онлайн, подключений
+- 📋 **Аудит логи** - история подключений
+- 👥 **Пользователи** - управление учётными записями
+
+## 📦 Установка
+
+```bash
+# Установить зависимости
+pip install flask pyjwt
+
+# Запустить
+cd web_panel
+python server.py
+```
+
+## 🔐 Вход
+
+- **URL:** http://localhost:21114
+- **Логин:** admin
+- **Пароль:** admin123
+
+## 🔗 Подключение к устройству
+
+### Способ 1: URI схема (автоматически)
+При клике "Подключиться" открывается:
+```
+rustdesk://connection/new/123456789
+```
+
+### Способ 2: Через командную строку
+```bash
+rustdesk.exe --connect 123456789
+```
+
+### Способ 3: API запрос
+```python
+import requests
+
+# Получить URI для подключения
+response = requests.post('http://localhost:21114/api/admin/connect', 
+    json={'device_id': '123456789'},
+    headers={'Authorization': 'Bearer YOUR_TOKEN'})
+
+uri = response.json()['uri']
+# rustdesk://connection/new/123456789
+
+# Открыть в Windows
+import os
+os.startfile(uri)
+```
+
+## 📡 API для интеграции
+
+### Получить все устройства
+```bash
+curl -H "Authorization: Bearer TOKEN" \
+     http://localhost:21114/api/admin/devices
+```
+
+**Response:**
+```json
+{
+  "devices": [
+    {
+      "id": "123456789",
+      "hostname": "DESKTOP-ABC",
+      "os": "Windows 10",
+      "username": "admin",
+      "version": "1.2.3",
+      "online": 1,
+      "last_seen": "2024-01-15 10:30:00"
+    }
+  ]
+}
+```
+
+### Инициировать подключение
+```bash
+curl -X POST -H "Authorization: Bearer TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"device_id": "123456789"}' \
+     http://localhost:21114/api/admin/connect
+```
+
+**Response:**
+```json
+{
+  "uri": "rustdesk://connection/new/123456789",
+  "device_id": "123456789"
+}
+```
+
+## 🏗️ Архитектура
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  RustDesk       │     │   API Server    │     │   Web Browser   │
+│  Client         │────▶│   (Flask)       │◀────│   (Panel)       │
+│                 │     │                 │     │                 │
+│ • heartbeat     │     │ • /api/*        │     │ • Dashboard     │
+│ • sysinfo       │     │ • SQLite DB     │     │ • Devices       │
+│ • audit         │     │ • JWT Auth      │     │ • Users         │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+         │                       │                       │
+         │   rustdesk://...      │                       │
+         ◀───────────────────────┼───────────────────────┘
+                                 │
+                          ┌──────┴──────┐
+                          │   hbbs/hbbr  │
+                          │  (ID/Relay)  │
+                          └─────────────┘
+```
+
+## 📊 База данных (SQLite)
+
+### Таблицы:
+
+**devices** - устройства
+```sql
+id, uuid, hostname, os, username, version, 
+cpu, memory, user_id, online, last_seen, created_at
+```
+
+**users** - пользователи
+```sql
+id, username, password, email, is_admin, status, created_at
+```
+
+**audit_logs** - логи аудита
+```sql
+id, type, device_id, peer_id, action, data, created_at
+```
+
+**connections** - история подключений
+```sql
+id, device_id, peer_id, conn_type, started_at, ended_at, duration
+```
+
+## ⚙️ Настройка RustDesk клиента
+
+В настройках клиента укажите **API Server**:
+```
+http://YOUR_SERVER_IP:21114
+```
+
+Или предустановите в коде (libs/hbb_common/src/config.rs).
+
+## 🔧 Переменные окружения
+
+```bash
+SECRET_KEY=your-secret-key
+API_HOST=0.0.0.0
+API_PORT=21114
+```
+
+## 📝 TODO
+
+- [ ] WebSocket для real-time обновлений
+- [ ] Групповое управление устройствами
+- [ ] Запланированные задачи
+- [ ] Отчёты и экспорт
+- [ ] Интеграция с LDAP/AD
+
+
+
+
+
+
+
