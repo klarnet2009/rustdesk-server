@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Extension},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
@@ -51,13 +51,18 @@ pub(crate) async fn spawn_api_server(peer_map: PeerMap) -> ResultType<()> {
     let addr = resolve_addr()?;
     let state = ApiState { peer_map };
     let router = build_router(state);
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    
+    // For axum 0.5, we use axum::Server instead of axum::serve
     let shutdown = async {
         if let Err(err) = crate::common::listen_signal().await {
             log::error!("HTTP API shutdown listener error: {}", err);
         }
     };
-    let server = axum::serve(listener, router.into_make_service()).with_graceful_shutdown(shutdown);
+    
+    let server = axum::Server::bind(&addr)
+        .serve(router.into_make_service())
+        .with_graceful_shutdown(shutdown);
+        
     tokio::spawn(async move {
         if let Err(err) = server.await {
             log::error!("HTTP API server error: {}", err);
@@ -108,10 +113,11 @@ fn build_router(state: ApiState) -> Router {
             "/api/connections/:id/disconnect",
             post(disconnect_connection),
         )
-        .with_state(state)
+        // For axum 0.5, use layer(AddExtensionLayer::new(state)) instead of with_state
+        .layer(axum::extract::Extension(state))
 }
 
-async fn list_connections(State(state): State<ApiState>) -> Json<Vec<ConnectionSummary>> {
+async fn list_connections(Extension(state): Extension<ApiState>) -> Json<Vec<ConnectionSummary>> {
     let items = state
         .peer_map
         .snapshot_all()
@@ -124,7 +130,7 @@ async fn list_connections(State(state): State<ApiState>) -> Json<Vec<ConnectionS
 
 async fn get_connection(
     Path(id): Path<String>,
-    State(state): State<ApiState>,
+    Extension(state): Extension<ApiState>,
 ) -> Result<Json<ConnectionDetail>, (StatusCode, Json<ApiError>)> {
     match state.peer_map.snapshot_for(&id).await {
         Some(snapshot) => Ok(Json(ConnectionDetail::from(snapshot))),
@@ -134,10 +140,10 @@ async fn get_connection(
 
 async fn disconnect_connection(
     Path(id): Path<String>,
-    State(state): State<ApiState>,
+    Extension(state): Extension<ApiState>,
 ) -> impl IntoResponse {
     if state.peer_map.disconnect(&id).await {
-        StatusCode::NO_CONTENT.into_response()
+        (StatusCode::NO_CONTENT, "").into_response()
     } else {
         not_found(format!("Peer {id} not found")).into_response()
     }
