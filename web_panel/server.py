@@ -927,40 +927,46 @@ SETTINGS_HTML = '''
     
     <div class="card-custom">
         <div class="card-header flex justify-between items-center">
-            <h6 class="font-semibold text-gray-900 dark:text-white"><i class="bi bi-diagram-3 mr-2"></i>LDAP / Active Directory</h6>
+            <h6 class="font-semibold text-gray-900 dark:text-white"><i class="bi bi-diagram-3 mr-2"></i>Active Directory (LDAP)</h6>
             <button type="button" class="btn btn-outline btn-sm" onclick="testLdap()">
-                <i class="bi bi-plug mr-1"></i>Test Connection
+                <i class="bi bi-magic mr-1"></i>Auto-Discover & Test
             </button>
         </div>
         <div class="card-body">
             <div id="ldapTestResult" class="alert hidden mb-4"></div>
             
-            <form action="{{ url_for('web_save_ldap') }}" method="POST">
+            <form action="{{ url_for('web_save_ldap') }}" method="POST" id="ldapForm">
+                <input type="hidden" name="ldap_base_dn" id="discoveredBaseDn" value="{{ ldap_config.get('base_dn', '') }}">
+                
                 <div class="mb-4">
-                    <label class="form-label">LDAP Server URL</label>
-                    <input type="text" class="form-control" name="ldap_server" placeholder="ldap://dc.example.com:389" value="{{ ldap_config.get('server', '') }}">
-                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">Example: ldap://192.168.1.10 or ldaps://dc.company.local</small>
+                    <label class="form-label">AD Server Address</label>
+                    <input type="text" class="form-control" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100" value="{{ ldap_config.get('server', '') }}" required>
+                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">IP address or domain of the Domain Controller</small>
                 </div>
                 <div class="mb-4">
-                    <label class="form-label">Base DN</label>
-                    <input type="text" class="form-control" name="ldap_base_dn" placeholder="DC=company,DC=local" value="{{ ldap_config.get('base_dn', '') }}">
-                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">The base distinguished name for user searches</small>
+                    <label class="form-label">Service Account (Username)</label>
+                    <input type="text" class="form-control" name="ldap_bind_dn" id="ldapUser" placeholder="admin@domain.local" value="{{ ldap_config.get('bind_dn', '') }}" required>
+                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">UPN (user@domain.local) or traditional DOMAIN\\user</small>
                 </div>
                 <div class="mb-4">
-                    <label class="form-label">Bind DN (Admin Account)</label>
-                    <input type="text" class="form-control" name="ldap_bind_dn" placeholder="CN=Administrator,CN=Users,DC=company,DC=local" value="{{ ldap_config.get('bind_dn', '') }}">
-                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">Leave empty for anonymous bind</small>
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" name="ldap_bind_password" id="ldapPass" placeholder="••••••••">
+                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">Only needed if changing existing configuration</small>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label">Bind Password</label>
-                    <input type="password" class="form-control" name="ldap_bind_password" placeholder="••••••••">
+                
+                {% if ldap_config.get('base_dn') %}
+                <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+                    <span class="text-gray-500 dark:text-gray-400 mr-2">Active Base DN:</span>
+                    <code class="text-xs text-blue-600 dark:text-blue-400">{{ ldap_config.get('base_dn') }}</code>
                 </div>
+                {% endif %}
+                
                 <div class="form-check form-switch mb-4">
                     <input type="checkbox" class="form-check-input" name="ldap_enabled" id="ldapEnabled" {{ 'checked' if ldap_config.get('enabled') else '' }}>
-                    <label class="form-check-label" for="ldapEnabled">Enable LDAP Authentication</label>
+                    <label class="form-check-label" for="ldapEnabled">Enable Active Directory Login</label>
                 </div>
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-save mr-1"></i>Save Settings
+                <button type="submit" class="btn btn-primary w-full">
+                    <i class="bi bi-save mr-1"></i>Save Configuration
                 </button>
             </form>
         </div>
@@ -971,17 +977,33 @@ SETTINGS_HTML = '''
 {% block scripts %}
 <script>
 function testLdap() {
+    const server = document.getElementById('ldapServer').value;
+    const user = document.getElementById('ldapUser').value;
+    const pass = document.getElementById('ldapPass').value;
+    
+    if (!server) {
+        alert("Please enter the AD Server Address first");
+        return;
+    }
+    
     const resultDiv = document.getElementById('ldapTestResult');
     resultDiv.className = 'alert alert-info';
-    resultDiv.innerHTML = '<i class="bi bi-hourglass-split mr-2"></i>Testing connection...';
+    resultDiv.innerHTML = '<i class="bi bi-hourglass-split mr-2"></i>Testing connection and discovering Base DN...';
     resultDiv.classList.remove('hidden');
     
-    fetch('/api/ldap/test', { method: 'POST' })
+    fetch('/api/ldap/test', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ server: server, username: user, password: pass })
+    })
         .then(r => r.json())
         .then(data => {
             if (data.success) {
                 resultDiv.className = 'alert alert-success';
                 resultDiv.innerHTML = '<i class="bi bi-check-circle mr-2"></i>' + data.message;
+                if (data.base_dn) {
+                    document.getElementById('discoveredBaseDn').value = data.base_dn;
+                }
             } else {
                 resultDiv.className = 'alert alert-danger';
                 resultDiv.innerHTML = '<i class="bi bi-x-circle mr-2"></i>' + data.message;
@@ -1297,11 +1319,17 @@ def web_save_ldap():
 @app.route('/api/ldap/test', methods=['POST'])
 @web_login_required
 def api_ldap_test():
-    """Test LDAP connection"""
-    success, message = test_ldap_connection()
+    """Test LDAP connection and discover Base DN dynamically"""
+    data = request.json or {}
+    server = data.get('server')
+    user = data.get('username')
+    pw = data.get('password')
+    
+    success, message, base_dn = test_ldap_connection(server, user, pw)
     return jsonify({
         "success": success,
         "message": message,
+        "base_dn": base_dn,
         "ldap_available": LDAP_AVAILABLE
     })
 

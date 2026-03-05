@@ -72,6 +72,14 @@ def ldap_authenticate(username, password):
         # Connect to LDAP server
         server = Server(server_url, get_info=ALL)
         
+        # Auto-discover Base DN if missing
+        if not base_dn:
+            base_dn = discover_base_dn(server_url, bind_dn, bind_password) or discover_base_dn(server_url, username, password)
+            if not base_dn:
+                print(f"[LDAP] Auto-discovery of Base DN failed, cannot proceed")
+                return None
+            print(f"[LDAP] Auto-discovered Base DN: {base_dn}")
+            
         # Try different authentication methods
         user_dn = None
         user_info = None
@@ -244,36 +252,90 @@ def sync_ldap_user_to_db(ldap_user, is_admin=False):
     return user_id
 
 
-def test_ldap_connection():
-    """Test LDAP connection with current settings"""
+def discover_base_dn(server_url, username=None, password=None):
+    """Query Active Directory Root DSE to automatically discover defaultNamingContext (Base DN)"""
+    if not LDAP_AVAILABLE or not server_url:
+        return None
+        
+    try:
+        server = Server(server_url, get_info=ALL)
+        
+        # Some ADs allow anonymous RootDSE read, others require authenticated bind. 
+        # Attempt authenticated first if credentials provided.
+        conn = None
+        if username and password:
+            # Prefer NTLM for Active Directory simple bindings (username@domain)
+            conn = Connection(server, user=username, password=password, authentication=NTLM)
+            if not conn.bind():
+                # Fallback to simple
+                conn = Connection(server, user=username, password=password, authentication=SIMPLE)
+                conn.bind()
+        else:
+            conn = Connection(server)
+            conn.bind()
+            
+        # The defaultNamingContext from server.info
+        if server.info and getattr(server.info, 'other', None):
+            naming_contexts = server.info.other.get('defaultNamingContext', [])
+            if naming_contexts:
+                conn.unbind()
+                return str(naming_contexts[0])
+                
+        # Alternative: explicit search on RootDSE
+        conn.search('', '(objectClass=*)', search_scope='BASE', attributes=['defaultNamingContext'])
+        if conn.entries and hasattr(conn.entries[0], 'defaultNamingContext'):
+            base_dn = str(conn.entries[0].defaultNamingContext.value)
+            conn.unbind()
+            return base_dn
+            
+    except Exception as e:
+        print(f"[LDAP] Auto-discovery failed: {e}")
+    
+    if conn:
+        conn.unbind()
+    return None
+
+def test_ldap_connection(test_server=None, test_user=None, test_pass=None):
+    """Test LDAP connection with optional provided settings, and attempt Base DN discovery"""
     if not LDAP_AVAILABLE:
-        return False, "ldap3 library not installed. Run: pip install ldap3"
+        return False, "ldap3 library not installed. Run: pip install ldap3", None
     
     config = get_ldap_config()
+    server_url = test_server or config.get('server')
+    username = test_user or config.get('bind_dn')
+    password = test_pass or config.get('bind_password')
     
-    if not config.get('server'):
-        return False, "LDAP server not configured"
+    if not server_url:
+        return False, "LDAP server not configured", None
     
     try:
-        server = Server(config['server'], get_info=ALL)
+        server = Server(server_url, get_info=ALL)
         
-        if config.get('bind_dn') and config.get('bind_password'):
-            conn = Connection(server, user=config['bind_dn'], password=config['bind_password'])
+        # Attempt Bind
+        if username and password:
+            conn = Connection(server, user=username, password=password, authentication=NTLM)
+            if not conn.bind():
+                conn = Connection(server, user=username, password=password, authentication=SIMPLE)
         else:
             conn = Connection(server)
         
         if conn.bind():
+            # Discover Base DN
+            base_dn = discover_base_dn(server_url, username, password)
+            
             info = f"Connected to {server.host}"
-            if server.info:
-                info += f" ({server.info.vendor_name})" if server.info.vendor_name else ""
+            if server.info and server.info.vendor_name:
+                 info += f" ({server.info.vendor_name})"
+            if base_dn:
+                 info += f". Discovered Base DN: {base_dn}"
+                 
             conn.unbind()
-            return True, info
+            return True, info, base_dn
         else:
-            return False, f"Bind failed: {conn.result}"
+            return False, f"Bind failed: {conn.result}", None
     
     except Exception as e:
-        return False, str(e)
-
+        return False, str(e), None
 
 # Test function
 if __name__ == '__main__':
