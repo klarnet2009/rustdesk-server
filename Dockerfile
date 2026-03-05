@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /build
 COPY . .
 
-RUN cargo build --release --bin hbbs --bin hbbr
+RUN cargo build --release --jobs 2 --bin hbbs --bin hbbr
 
 # ---- Runtime ----
 FROM debian:bookworm-slim
