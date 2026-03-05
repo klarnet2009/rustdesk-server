@@ -9,7 +9,9 @@ networks:
 services:
   hbbs:
     container_name: hbbs
-    image: rustdesk/rustdesk-server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.build
     ports:
       - "21115:21115"
       - "21116:21116"
@@ -26,7 +28,9 @@ services:
 
   hbbr:
     container_name: hbbr
-    image: rustdesk/rustdesk-server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.build
     ports:
       - "21117:21117"
     command: hbbr
