@@ -1565,16 +1565,11 @@ init_db()
 
 if __name__ == '__main__':
     
-    # Check SSL certificates
+    # Force HTTP mode for Coolify's reverse proxy terminating SSL
     ssl_context = None
     protocol = "http"
-    if SSL_ENABLED and os.path.exists(SSL_CERT) and os.path.exists(SSL_KEY):
-        ssl_context = (SSL_CERT, SSL_KEY)
-        protocol = "https"
-        ssl_status = "ENABLED"
-    else:
-        ssl_status = "DISABLED (certificates not found)"
-    
+    ssl_status = "MANAGED BY REVERSE PROXY (Coolify)"
+
     print(f"""
 ╔═══════════════════════════════════════════════════════════════════╗
 ║          RustDesk Web Management Panel v2.0 (Tailwind)            ║
