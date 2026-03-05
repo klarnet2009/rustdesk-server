@@ -39,25 +39,3 @@ services:
     networks:
       - rustdesk-net
     restart: unless-stopped
-
-  web-panel:
-    container_name: rustdesk-web-panel
-    build:
-      context: ../rustdesk/web_panel
-      dockerfile: Dockerfile
-    # В Coolify для веб-сервисов лучше использовать expose вместо ports, 
-    # чтобы Traefik мог проксировать трафик без конфликта портов на хосте
-    expose:
-      - "21114"
-    environment:
-      - API_HOST=0.0.0.0
-      - API_PORT=21114
-      - SSL_ENABLED=false
-    volumes:
-      - ./data/web_panel:/app/data
-    networks:
-      - rustdesk-net
-      - coolify
-    depends_on:
-      - hbbs
-    restart: unless-stopped
