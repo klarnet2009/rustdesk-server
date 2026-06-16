@@ -175,7 +175,7 @@ def serve_static(filename):
 
 # ==================== TEMPLATES ====================
 
-BASE_HTML = '''
+BASE_HTML = r'''
 <!DOCTYPE html>
 <html lang="ru" data-theme="corporate">
 <head>
@@ -193,30 +193,30 @@ BASE_HTML = '''
             <!-- Top Navbar -->
             <div class="navbar bg-base-100 border-b border-base-300 px-6 justify-between shadow-sm z-10">
                 <div class="flex-none lg:hidden">
-                    <label for="sidebar-drawer" class="btn btn-square btn-ghost">
-                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    <label for="sidebar-drawer" class="btn btn-square btn-ghost" aria-label="Toggle Sidebar">
+                        <i data-lucide="menu" class="w-6 h-6" aria-hidden="true"></i>
                     </label>
                 </div>
                 <div class="flex-grow">
-                    <span class="text-sm opacity-60">{{ current_time }}</span>
+                    <span class="text-sm opacity-60 tabular-nums">{{ current_time }}</span>
                 </div>
                 <div class="flex-none gap-2">
                     <!-- Theme Toggle -->
-                    <button class="btn btn-ghost btn-circle" onclick="toggleTheme()" title="Toggle Theme" id="themeIconContainer">
-                        <i data-lucide="moon" class="w-5 h-5"></i>
+                    <button class="btn btn-ghost btn-circle" onclick="toggleTheme()" title="Toggle Theme" aria-label="Toggle Theme" id="themeIconContainer">
+                        <i data-lucide="moon" class="w-5 h-5" aria-hidden="true"></i>
                     </button>
                     
                     <!-- User Dropdown -->
                     <div class="dropdown dropdown-end">
                         <div tabindex="0" role="button" class="btn btn-ghost m-1 flex items-center gap-2 normal-case font-medium">
-                            <i data-lucide="user" class="w-5 h-5 opacity-70"></i>
+                            <i data-lucide="user" class="w-5 h-5 opacity-70" aria-hidden="true"></i>
                             {{ session.username }}
-                            <i data-lucide="chevron-down" class="w-4 h-4 opacity-50"></i>
+                            <i data-lucide="chevron-down" class="w-4 h-4 opacity-50" aria-hidden="true"></i>
                         </div>
                         <ul tabindex="0" class="dropdown-content z-[30] menu p-2 shadow bg-base-100 rounded-box w-52 border border-base-300 mt-2">
                             <li>
                                 <a href="{{ url_for('web_logout') }}" class="text-error">
-                                    <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+                                    <i data-lucide="log-out" class="w-4 h-4" aria-hidden="true"></i> Logout
                                 </a>
                             </li>
                         </ul>
@@ -237,7 +237,7 @@ BASE_HTML = '''
                 <!-- Brand -->
                 <div class="px-4 py-3 border-b border-base-300 mb-4">
                     <a href="/" class="flex items-center gap-2 text-xl font-bold text-base-content no-underline">
-                        <i data-lucide="monitor" class="text-primary w-6 h-6"></i>
+                        <i data-lucide="monitor" class="text-primary w-6 h-6" aria-hidden="true"></i>
                         <span>RustDesk Panel</span>
                     </a>
                 </div>
@@ -245,31 +245,31 @@ BASE_HTML = '''
                 <ul class="menu menu-vertical p-0 gap-1 flex-grow">
                     <li>
                         <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'dashboard' else '' }}" href="{{ url_for('web_dashboard') }}">
-                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                            <i data-lucide="layout-dashboard" class="w-5 h-5" aria-hidden="true"></i>
                             Dashboard
                         </a>
                     </li>
                     <li>
                         <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'devices' else '' }}" href="{{ url_for('web_devices') }}">
-                            <i data-lucide="monitor" class="w-5 h-5"></i>
+                            <i data-lucide="monitor" class="w-5 h-5" aria-hidden="true"></i>
                             Devices
                         </a>
                     </li>
                     <li>
                         <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'users' else '' }}" href="{{ url_for('web_users') }}">
-                            <i data-lucide="users" class="w-5 h-5"></i>
+                            <i data-lucide="users" class="w-5 h-5" aria-hidden="true"></i>
                             Users
                         </a>
                     </li>
                     <li>
                         <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'logs' else '' }}" href="{{ url_for('web_logs') }}">
-                            <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                            <i data-lucide="clipboard-list" class="w-5 h-5" aria-hidden="true"></i>
                             Logs
                         </a>
                     </li>
                     <li>
                         <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'settings' else '' }}" href="{{ url_for('web_settings') }}">
-                            <i data-lucide="settings" class="w-5 h-5"></i>
+                            <i data-lucide="settings" class="w-5 h-5" aria-hidden="true"></i>
                             Settings
                         </a>
                     </li>
@@ -307,8 +307,8 @@ BASE_HTML = '''
             if (iconContainer) {
                 const isDark = document.documentElement.getAttribute('data-theme') === 'business';
                 iconContainer.innerHTML = isDark 
-                    ? '<i data-lucide="sun" class="w-5 h-5"></i>' 
-                    : '<i data-lucide="moon" class="w-5 h-5"></i>';
+                    ? '<i data-lucide="sun" class="w-5 h-5" aria-hidden="true"></i>' 
+                    : '<i data-lucide="moon" class="w-5 h-5" aria-hidden="true"></i>';
                 if (window.lucide) {
                     lucide.createIcons();
                 }
@@ -324,6 +324,19 @@ BASE_HTML = '''
             if (window.lucide) {
                 lucide.createIcons();
             }
+            
+            // Handle form submission loading states
+            document.addEventListener('submit', (e) => {
+                const form = e.target;
+                const btn = form.querySelector('button[type="submit"]');
+                if (btn && form.checkValidity()) {
+                    btn.classList.add('btn-disabled');
+                    let btnText = btn.innerText.trim();
+                    if (btnText === "Add User") btnText = "Adding User…";
+                    else if (btnText === "Save Configuration") btnText = "Saving…";
+                    btn.innerHTML = `<span class="loading loading-spinner loading-sm" aria-hidden="true"></span> ${btnText}`;
+                }
+            });
         });
     </script>
     {% block scripts %}{% endblock %}
@@ -331,7 +344,7 @@ BASE_HTML = '''
 </html>
 '''
 
-LOGIN_HTML = '''
+LOGIN_HTML = r'''
 <!DOCTYPE html>
 <html lang="ru" data-theme="corporate">
 <head>
@@ -346,39 +359,39 @@ LOGIN_HTML = '''
         <div class="card-body p-8">
             <div class="flex flex-col items-center mb-6">
                 <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                    <i data-lucide="monitor" class="w-8 h-8 text-primary"></i>
+                    <i data-lucide="monitor" class="w-8 h-8 text-primary" aria-hidden="true"></i>
                 </div>
-                <h2 class="card-title text-2xl font-bold text-base-content">RustDesk Panel</h2>
+                <h2 class="card-title text-2xl font-bold text-base-content text-balance">RustDesk Panel</h2>
                 <p class="text-sm text-base-content/60">Sign in to your account</p>
             </div>
             
             {% if error %}
-            <div class="alert alert-error shadow-sm mb-4">
-                <i data-lucide="alert-circle" class="w-5 h-5 text-white"></i>
+            <div class="alert alert-error shadow-sm mb-4" aria-live="polite">
+                <i data-lucide="alert-circle" class="w-5 h-5 text-white" aria-hidden="true"></i>
                 <span class="text-sm font-semibold text-white">{{ error }}</span>
             </div>
             {% endif %}
             
             <form method="POST" class="space-y-4">
                 <div class="form-control w-full">
-                    <label class="label"><span class="label-text font-semibold">Username</span></label>
+                    <label class="label" for="login-username"><span class="label-text font-semibold">Username</span></label>
                     <label class="input input-bordered flex items-center gap-2">
-                        <i data-lucide="user" class="w-4 h-4 opacity-50"></i>
-                        <input type="text" class="grow" name="username" placeholder="Username" required autofocus />
+                        <i data-lucide="user" class="w-4 h-4 opacity-50" aria-hidden="true"></i>
+                        <input type="text" id="login-username" class="grow" name="username" placeholder="Username… e.g. admin" required autocomplete="username" spellcheck="false" autofocus />
                     </label>
                 </div>
                 
                 <div class="form-control w-full">
-                    <label class="label"><span class="label-text font-semibold">Password</span></label>
+                    <label class="label" for="login-password"><span class="label-text font-semibold">Password</span></label>
                     <label class="input input-bordered flex items-center gap-2">
-                        <i data-lucide="lock" class="w-4 h-4 opacity-50"></i>
-                        <input type="password" class="grow" name="password" placeholder="Password" required />
+                        <i data-lucide="lock" class="w-4 h-4 opacity-50" aria-hidden="true"></i>
+                        <input type="password" id="login-password" class="grow" name="password" placeholder="Password…" required autocomplete="current-password" spellcheck="false" />
                     </label>
                 </div>
                 
                 <div class="card-actions justify-end mt-6">
                     <button type="submit" class="btn btn-primary w-full text-white">
-                        <i data-lucide="log-in" class="w-4 h-4"></i> Sign In
+                        <i data-lucide="log-in" class="w-4 h-4" aria-hidden="true"></i> Sign In
                     </button>
                 </div>
             </form>
@@ -392,16 +405,28 @@ LOGIN_HTML = '''
             if (window.lucide) {
                 lucide.createIcons();
             }
+            
+            // Handle login form submission loading states
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', (e) => {
+                    const btn = form.querySelector('button[type="submit"]');
+                    if (btn && form.checkValidity()) {
+                        btn.classList.add('btn-disabled');
+                        btn.innerHTML = `<span class="loading loading-spinner loading-sm" aria-hidden="true"></span> Signing In…`;
+                    }
+                });
+            }
         });
     </script>
 </body>
 </html>
 '''
 
-DASHBOARD_HTML = '''
+DASHBOARD_HTML = r'''
 {% extends "base" %}
 {% block content %}
-<h4 class="text-xl font-semibold text-base-content mb-6">Dashboard</h4>
+<h1 class="text-2xl font-bold text-base-content text-balance mb-6">Dashboard</h1>
 
 <!-- Stats -->
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -409,11 +434,11 @@ DASHBOARD_HTML = '''
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-primary">
                 <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center">
-                    <i data-lucide="monitor" class="w-6 h-6"></i>
+                    <i data-lucide="monitor" class="w-6 h-6" aria-hidden="true"></i>
                 </div>
             </div>
             <div>
-                <div class="stat-value text-3xl font-bold text-base-content mb-1">{{ stats.total }}</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.total }}</div>
                 <div class="stat-title text-sm opacity-60">Total Devices</div>
             </div>
         </div>
@@ -423,11 +448,11 @@ DASHBOARD_HTML = '''
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-success">
                 <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg flex items-center justify-center">
-                    <i data-lucide="wifi" class="w-6 h-6"></i>
+                    <i data-lucide="wifi" class="w-6 h-6" aria-hidden="true"></i>
                 </div>
             </div>
             <div>
-                <div class="stat-value text-3xl font-bold text-base-content mb-1">{{ stats.online }}</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.online }}</div>
                 <div class="stat-title text-sm opacity-60">Online Now</div>
             </div>
         </div>
@@ -437,11 +462,11 @@ DASHBOARD_HTML = '''
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-secondary">
                 <div class="w-12 h-12 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 rounded-lg flex items-center justify-center">
-                    <i data-lucide="arrow-left-right" class="w-6 h-6"></i>
+                    <i data-lucide="arrow-left-right" class="w-6 h-6" aria-hidden="true"></i>
                 </div>
             </div>
             <div>
-                <div class="stat-value text-3xl font-bold text-base-content mb-1">{{ stats.connections_today }}</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.connections_today }}</div>
                 <div class="stat-title text-sm opacity-60">Connections Today</div>
             </div>
         </div>
@@ -451,11 +476,11 @@ DASHBOARD_HTML = '''
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-warning">
                 <div class="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg flex items-center justify-center">
-                    <i data-lucide="users" class="w-6 h-6"></i>
+                    <i data-lucide="users" class="w-6 h-6" aria-hidden="true"></i>
                 </div>
             </div>
             <div>
-                <div class="stat-value text-3xl font-bold text-base-content mb-1">{{ stats.users }}</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.users }}</div>
                 <div class="stat-title text-sm opacity-60">Users</div>
             </div>
         </div>
@@ -466,7 +491,7 @@ DASHBOARD_HTML = '''
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
     <div class="lg:col-span-2 card bg-base-100 border border-base-300 shadow-sm">
         <div class="card-body p-5">
-            <h2 class="card-title text-base font-semibold">Connections (Last 7 Days)</h2>
+            <h2 class="card-title text-base font-semibold text-balance">Connections (Last 7&nbsp;Days)</h2>
             <div class="relative h-72">
                 <canvas id="connectionsChart"></canvas>
             </div>
@@ -474,7 +499,7 @@ DASHBOARD_HTML = '''
     </div>
     <div class="card bg-base-100 border border-base-300 shadow-sm">
         <div class="card-body p-5">
-            <h2 class="card-title text-base font-semibold">OS Distribution</h2>
+            <h2 class="card-title text-base font-semibold text-balance">OS Distribution</h2>
             <div class="relative h-72">
                 <canvas id="osChart"></canvas>
             </div>
@@ -486,7 +511,7 @@ DASHBOARD_HTML = '''
 <div class="card bg-base-100 border border-base-300 shadow-sm">
     <div class="card-body p-0">
         <div class="p-5 flex justify-between items-center border-b border-base-300">
-            <h2 class="card-title text-base font-semibold">Recent Devices</h2>
+            <h2 class="card-title text-base font-semibold text-balance">Recent Devices</h2>
             <a href="{{ url_for('web_devices') }}" class="btn btn-outline btn-sm">View All</a>
         </div>
         <div class="overflow-x-auto">
@@ -506,11 +531,11 @@ DASHBOARD_HTML = '''
                 <tbody>
                     {% for d in devices[:10] %}
                     <tr class="hover">
-                        <td><span class="font-mono font-semibold text-primary">{{ d.id }}</span></td>
+                        <td><span class="font-mono font-semibold text-primary tabular-nums">{{ d.id }}</span></td>
                         <td>{{ d.hostname or '-' }}</td>
                         <td>{{ d.username or '-' }}</td>
                         <td>{{ d.os_short }}</td>
-                        <td>{{ d.ip or '-' }}</td>
+                        <td><span class="tabular-nums">{{ d.ip or '-' }}</span></td>
                         <td>
                             {% if d.online %}
                             <span class="badge badge-success gap-1 text-white text-xs font-semibold">
@@ -521,10 +546,10 @@ DASHBOARD_HTML = '''
                             <span class="badge badge-ghost text-xs font-semibold">Offline</span>
                             {% endif %}
                         </td>
-                        <td>{{ d.last_seen_str }}</td>
+                        <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
                         <td>
-                            <button class="btn btn-primary btn-sm text-white" onclick="connectTo('{{ d.id }}')">
-                                <i data-lucide="link" class="w-4 h-4"></i> Connect
+                            <button class="btn btn-primary btn-sm text-white" onclick="connectTo('{{ d.id }}')" aria-label="Connect to device {{ d.id }}">
+                                <i data-lucide="link" class="w-4 h-4" aria-hidden="true"></i> Connect
                             </button>
                         </td>
                     </tr>
@@ -596,13 +621,13 @@ new Chart(osCtx, {
 {% endblock %}
 '''
 
-DEVICES_HTML = '''
+DEVICES_HTML = r'''
 {% extends "base" %}
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h4 class="text-xl font-semibold text-base-content">Devices</h4>
+    <h1 class="text-2xl font-bold text-base-content text-balance">Devices</h1>
     <button class="btn btn-primary text-white" onclick="location.reload()">
-        <i data-lucide="rotate-cw" class="w-4 h-4 mr-2"></i>Refresh
+        <i data-lucide="rotate-cw" class="w-4 h-4 mr-2" aria-hidden="true"></i>Refresh
     </button>
 </div>
 
@@ -626,12 +651,12 @@ DEVICES_HTML = '''
                 <tbody>
                     {% for d in devices %}
                     <tr class="hover">
-                        <td><span class="font-mono font-semibold text-primary">{{ d.id }}</span></td>
+                        <td><span class="font-mono font-semibold text-primary tabular-nums">{{ d.id }}</span></td>
                         <td>{{ d.hostname or '-' }}</td>
                         <td>{{ d.username or '-' }}</td>
                         <td>{{ d.os_short }}</td>
-                        <td>{{ d.ip or '-' }}</td>
-                        <td>{{ d.version or '-' }}</td>
+                        <td><span class="tabular-nums">{{ d.ip or '-' }}</span></td>
+                        <td><span class="tabular-nums">{{ d.version or '-' }}</span></td>
                         <td>
                             {% if d.online %}
                             <span class="badge badge-success gap-1 text-white text-xs font-semibold">
@@ -642,13 +667,13 @@ DEVICES_HTML = '''
                             <span class="badge badge-ghost text-xs font-semibold">Offline</span>
                             {% endif %}
                         </td>
-                        <td>{{ d.last_seen_str }}</td>
+                        <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
                         <td class="flex gap-1">
-                            <button class="btn btn-primary btn-sm btn-square text-white" onclick="connectTo('{{ d.id }}')" title="Connect">
-                                <i data-lucide="link" class="w-4 h-4"></i>
+                            <button class="btn btn-primary btn-sm btn-square text-white" onclick="connectTo('{{ d.id }}')" title="Connect" aria-label="Connect to device {{ d.id }}">
+                                <i data-lucide="link" class="w-4 h-4" aria-hidden="true"></i>
                             </button>
-                            <button class="btn btn-outline btn-sm btn-square" onclick="showDetails('{{ d.id }}')" title="Details">
-                                <i data-lucide="info" class="w-4 h-4"></i>
+                            <button class="btn btn-outline btn-sm btn-square" onclick="showDetails('{{ d.id }}')" title="Details" aria-label="View details for device {{ d.id }}">
+                                <i data-lucide="info" class="w-4 h-4" aria-hidden="true"></i>
                             </button>
                         </td>
                     </tr>
@@ -663,9 +688,9 @@ DEVICES_HTML = '''
 <dialog id="detailsModal" class="modal">
     <div class="modal-box">
         <form method="dialog">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close modal">✕</button>
         </form>
-        <h3 class="font-bold text-lg mb-4">Device Details</h3>
+        <h3 class="font-bold text-lg text-balance mb-4">Device Details</h3>
         <div id="detailsBody">
         </div>
     </div>
@@ -704,20 +729,20 @@ function showDetails(id) {
         <div class="overflow-x-auto">
             <table class="table table-compact w-full text-sm">
                 <tbody>
-                    <tr class="border-b border-base-200"><th class="w-24 opacity-60">ID</th><td><code class="font-mono font-semibold text-primary">${d.id}</code></td></tr>
+                    <tr class="border-b border-base-200"><th class="w-24 opacity-60">ID</th><td><code class="font-mono font-semibold text-primary tabular-nums">${d.id}</code></td></tr>
                     <tr class="border-b border-base-200"><th class="opacity-60">Hostname</th><td>${d.hostname || '-'}</td></tr>
                     <tr class="border-b border-base-200"><th class="opacity-60">Username</th><td>${d.username || '-'}</td></tr>
                     <tr class="border-b border-base-200"><th class="opacity-60">OS</th><td>${d.os || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">IP</th><td>${d.ip || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">IP</th><td><span class="tabular-nums">${d.ip || '-'}</span></td></tr>
                     <tr class="border-b border-base-200"><th class="opacity-60">CPU</th><td>${d.cpu || '-'}</td></tr>
                     <tr class="border-b border-base-200"><th class="opacity-60">Memory</th><td>${d.memory || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Version</th><td>${d.version || '-'}</td></tr>
-                    <tr><th class="opacity-60">Last Seen</th><td>${d.last_seen_str}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Version</th><td><span class="tabular-nums">${d.version || '-'}</span></td></tr>
+                    <tr><th class="opacity-60">Last Seen</th><td><span class="tabular-nums">${d.last_seen_str}</span></td></tr>
                 </tbody>
             </table>
         </div>
-        <button class="btn btn-primary w-full mt-4 text-white" onclick="connectTo('${d.id}')">
-            <i data-lucide="link" class="w-4 h-4 mr-2"></i>Connect
+        <button class="btn btn-primary w-full mt-4 text-white" onclick="connectTo('${d.id}')" aria-label="Connect to device ${d.id}">
+            <i data-lucide="link" class="w-4 h-4 mr-2" aria-hidden="true"></i>Connect
         </button>
     `;
     document.getElementById('detailsModal').showModal();
@@ -729,13 +754,13 @@ function showDetails(id) {
 {% endblock %}
 '''
 
-USERS_HTML = '''
+USERS_HTML = r'''
 {% extends "base" %}
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold text-base-content">Users</h1>
+    <h1 class="text-2xl font-bold text-base-content text-balance">Users</h1>
     <button class="btn btn-primary text-white" onclick="document.getElementById('addUserModal').showModal()">
-        <i data-lucide="user-plus" class="w-4 h-4 mr-2"></i>Add User
+        <i data-lucide="user-plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>Add User
     </button>
 </div>
 
@@ -757,8 +782,11 @@ USERS_HTML = '''
                 <tbody>
                     {% for u in users %}
                     <tr class="hover">
-                        <td>{{ u.id }}</td>
-                        <td class="font-medium flex items-center gap-2"><i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>{{ u.username }}</td>
+                        <td><span class="tabular-nums">{{ u.id }}</span></td>
+                        <td class="font-medium flex items-center gap-2">
+                            <i data-lucide="user" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
+                            {{ u.username }}
+                        </td>
                         <td>{{ u.email or '-' }}</td>
                         <td>
                             {% if u.is_admin %}
@@ -774,10 +802,10 @@ USERS_HTML = '''
                             <span class="badge badge-ghost text-xs font-semibold">Disabled</span>
                             {% endif %}
                         </td>
-                        <td class="text-sm opacity-70">{{ u.created_at }}</td>
+                        <td><span class="text-sm opacity-70 tabular-nums">{{ u.created_at }}</span></td>
                         <td>
-                            <button class="btn btn-sm btn-ghost text-red-600 {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick="deleteUser({{ u.id }})" {{ 'disabled' if u.username == 'admin' else '' }}>
-                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            <button class="btn btn-sm btn-ghost text-red-600 {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick="deleteUser({{ u.id }}, '{{ u.username }}')" {{ 'disabled' if u.username == 'admin' else '' }} aria-label="Delete user {{ u.username }}">
+                                <i data-lucide="trash-2" class="w-5 h-5" aria-hidden="true"></i>
                             </button>
                         </td>
                     </tr>
@@ -792,31 +820,31 @@ USERS_HTML = '''
 <dialog id="addUserModal" class="modal">
     <div class="modal-box">
         <form method="dialog">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close modal">✕</button>
         </form>
-        <h3 class="font-bold text-lg mb-4">Add User</h3>
+        <h3 class="font-bold text-lg text-balance mb-4">Add User</h3>
         <form action="{{ url_for('web_add_user') }}" method="POST">
             <div class="form-control w-full mb-4">
-                <label class="label"><span class="label-text font-semibold">Username</span></label>
-                <input type="text" class="input input-bordered w-full" name="username" required>
+                <label class="label" for="add-username"><span class="label-text font-semibold">Username</span></label>
+                <input type="text" id="add-username" class="input input-bordered w-full" name="username" placeholder="Username… e.g. jdoe" required autocomplete="username" spellcheck="false">
             </div>
             <div class="form-control w-full mb-4">
-                <label class="label"><span class="label-text font-semibold">Email</span></label>
-                <input type="email" class="input input-bordered w-full" name="email">
+                <label class="label" for="add-email"><span class="label-text font-semibold">Email</span></label>
+                <input type="email" id="add-email" class="input input-bordered w-full" name="email" placeholder="Email… e.g. jdoe@company.com" autocomplete="email" spellcheck="false">
             </div>
             <div class="form-control w-full mb-4">
-                <label class="label"><span class="label-text font-semibold">Password</span></label>
-                <input type="password" class="input input-bordered w-full" name="password" required>
+                <label class="label" for="add-password"><span class="label-text font-semibold">Password</span></label>
+                <input type="password" id="add-password" class="input input-bordered w-full" name="password" placeholder="Password…" required autocomplete="new-password" spellcheck="false">
             </div>
             <div class="form-control w-full mb-6">
-                <label class="label cursor-pointer justify-start gap-3">
-                    <input type="checkbox" class="checkbox checkbox-primary" name="is_admin" id="isAdmin">
+                <label class="label cursor-pointer justify-start gap-3" for="add-is-admin">
+                    <input type="checkbox" class="checkbox checkbox-primary" name="is_admin" id="add-is-admin">
                     <span class="label-text font-semibold">Administrator</span>
                 </label>
             </div>
             <div class="flex justify-end gap-3 mt-4">
                 <button type="button" class="btn btn-ghost" onclick="document.getElementById('addUserModal').close()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Add User</button>
+                <button type="submit" class="btn btn-primary text-white">Add User</button>
             </div>
         </form>
     </div>
@@ -832,23 +860,21 @@ $(document).ready(function() {
     $('#usersTable').DataTable();
 });
 
-function deleteUser(id) {
-    if (confirm('Delete this user?')) {
+function deleteUser(id, username) {
+    if (confirm(`Delete user “${username}”?`)) {
         fetch('/api/admin/users/' + id, { method: 'DELETE' })
             .then(() => location.reload());
     }
 }
-
-// openModal is no longer needed since we use native dialog.showModal()
 </script>
 {% endblock %}
 '''
 
-LOGS_HTML = '''
+LOGS_HTML = r'''
 {% extends "base" %}
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold text-base-content">Audit Logs</h1>
+    <h1 class="text-2xl font-bold text-base-content text-balance">Audit Logs</h1>
     <div class="join">
         <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'all' else 'btn-outline' }}" onclick="location.href='?type=all'">All</button>
         <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'conn' else 'btn-outline' }}" onclick="location.href='?type=conn'">Connections</button>
@@ -873,7 +899,7 @@ LOGS_HTML = '''
                 <tbody>
                     {% for log in logs %}
                     <tr class="hover">
-                        <td class="text-sm opacity-75">{{ log.created_at }}</td>
+                        <td><span class="text-sm opacity-75 tabular-nums">{{ log.created_at }}</span></td>
                         <td>
                             {% if log.type == 'conn' %}
                             <span class="badge badge-accent text-white text-xs font-semibold">conn</span>
@@ -885,8 +911,8 @@ LOGS_HTML = '''
                             <span class="badge badge-ghost text-xs font-semibold">{{ log.type }}</span>
                             {% endif %}
                         </td>
-                        <td><code class="font-mono text-sm opacity-80">{{ log.device_id or '-' }}</code></td>
-                        <td><code class="font-mono text-sm opacity-80">{{ log.peer_id or '-' }}</code></td>
+                        <td><code class="font-mono text-sm opacity-80 tabular-nums">{{ log.device_id or '-' }}</code></td>
+                        <td><code class="font-mono text-sm opacity-80 tabular-nums">{{ log.peer_id or '-' }}</code></td>
                         <td>{{ log.action or '-' }}</td>
                     </tr>
                     {% endfor %}
@@ -909,34 +935,34 @@ $(document).ready(function() {
 {% endblock %}
 '''
 
-SETTINGS_HTML = '''
+SETTINGS_HTML = r'''
 {% extends "base" %}
 {% block content %}
-<h1 class="text-2xl font-bold text-base-content mb-6">Settings</h1>
+<h1 class="text-2xl font-bold text-base-content text-balance mb-6">Settings</h1>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div class="space-y-6">
         <div class="card bg-base-100 border border-base-300 shadow-sm">
             <div class="card-body p-6">
-                <h2 class="card-title text-base font-semibold border-b border-base-200 pb-3 mb-4"><i data-lucide="server" class="text-primary w-5 h-5 mr-2"></i>Server Configuration</h2>
+                <h2 class="card-title text-base font-semibold text-balance border-b border-base-200 pb-3 mb-4"><i data-lucide="server" class="text-primary w-5 h-5 mr-2" aria-hidden="true"></i>Server Configuration</h2>
                 <div class="form-control w-full mb-4">
-                    <label class="label"><span class="label-text opacity-70">ID Server</span></label>
-                    <input type="text" class="input input-bordered w-full bg-base-200" value="10.21.31.11" disabled>
+                    <label class="label" for="settings-id-server"><span class="label-text opacity-70">ID Server</span></label>
+                    <input type="text" id="settings-id-server" class="input input-bordered w-full bg-base-200 tabular-nums" value="10.21.31.11" disabled>
                 </div>
                 <div class="form-control w-full mb-4">
-                    <label class="label"><span class="label-text opacity-70">Relay Server</span></label>
-                    <input type="text" class="input input-bordered w-full bg-base-200" value="10.21.31.11" disabled>
+                    <label class="label" for="settings-relay-server"><span class="label-text opacity-70">Relay Server</span></label>
+                    <input type="text" id="settings-relay-server" class="input input-bordered w-full bg-base-200 tabular-nums" value="10.21.31.11" disabled>
                 </div>
                 <div class="form-control w-full">
-                    <label class="label"><span class="label-text opacity-70">API Server</span></label>
-                    <input type="text" class="input input-bordered w-full bg-base-200" value="http://{{ request.host }}" disabled>
+                    <label class="label" for="settings-api-server"><span class="label-text opacity-70">API Server</span></label>
+                    <input type="text" id="settings-api-server" class="input input-bordered w-full bg-base-200" value="http://{{ request.host }}" disabled>
                 </div>
             </div>
         </div>
         
         <div class="card bg-base-100 border border-base-300 shadow-sm">
             <div class="card-body p-6">
-                <h2 class="card-title text-base font-semibold border-b border-base-200 pb-3 mb-4"><i data-lucide="info" class="text-primary w-5 h-5 mr-2"></i>System Info</h2>
+                <h2 class="card-title text-base font-semibold text-balance border-b border-base-200 pb-3 mb-4"><i data-lucide="info" class="text-primary w-5 h-5 mr-2" aria-hidden="true"></i>System Info</h2>
                 <div class="overflow-x-auto">
                     <table class="table table-compact w-full text-sm">
                         <tbody>
@@ -970,48 +996,48 @@ SETTINGS_HTML = '''
     <div class="card bg-base-100 border border-base-300 shadow-sm">
         <div class="card-body p-6">
             <div class="flex justify-between items-center border-b border-base-200 pb-3 mb-4">
-                <h2 class="card-title text-base font-semibold"><i data-lucide="network" class="text-primary w-5 h-5 mr-2"></i>LDAP / Active Directory</h2>
+                <h2 class="card-title text-base font-semibold text-balance"><i data-lucide="network" class="text-primary w-5 h-5 mr-2" aria-hidden="true"></i>LDAP / Active Directory</h2>
                 <button type="button" class="btn btn-outline btn-sm" onclick="testLdap()">
-                    <i data-lucide="plug" class="w-4 h-4 mr-1"></i>Auto-Discover & Test
+                    <i data-lucide="plug" class="w-4 h-4 mr-1" aria-hidden="true"></i>Auto-Discover & Test
                 </button>
             </div>
             
-            <div id="ldapTestResult" class="alert hidden mb-4 shadow-sm"></div>
+            <div id="ldapTestResult" class="alert hidden mb-4 shadow-sm" aria-live="polite"></div>
             
             <form action="{{ url_for('web_save_ldap') }}" method="POST" id="ldapForm">
                 <input type="hidden" name="ldap_base_dn" id="discoveredBaseDn" value="{{ ldap_config.get('base_dn', '') }}">
                 
                 <div class="form-control w-full mb-4">
-                    <label class="label"><span class="label-text font-semibold">AD Server Address</span></label>
-                    <input type="text" class="input input-bordered w-full" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100" value="{{ ldap_config.get('server', '') }}" required>
+                    <label class="label" for="ldapServer"><span class="label-text font-semibold">AD Server Address</span></label>
+                    <input type="text" class="input input-bordered w-full" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100… e.g. ldap://dc.company.local" value="{{ ldap_config.get('server', '') }}" autocomplete="off" spellcheck="false" required>
                     <span class="label-text-alt opacity-50 mt-1 block">IP address or domain of the Domain Controller</span>
                 </div>
                 <div class="form-control w-full mb-4">
-                    <label class="label"><span class="label-text font-semibold">Service Account (Username)</span></label>
-                    <input type="text" class="input input-bordered w-full" name="ldap_bind_dn" id="ldapUser" placeholder="admin@domain.local" value="{{ ldap_config.get('bind_dn', '') }}" required>
-                    <span class="label-text-alt opacity-50 mt-1 block">UPN (user@domain.local) or traditional DOMAIN\\user</span>
+                    <label class="label" for="ldapUser"><span class="label-text font-semibold">Service Account (Username)</span></label>
+                    <input type="text" class="input input-bordered w-full" name="ldap_bind_dn" id="ldapUser" placeholder="admin@domain.local… e.g. bind_user@company.local" value="{{ ldap_config.get('bind_dn', '') }}" autocomplete="off" spellcheck="false" required>
+                    <span class="label-text-alt opacity-50 mt-1 block">UPN (user@domain.local) or traditional DOMAIN\user</span>
                 </div>
                 <div class="form-control w-full mb-4">
-                    <label class="label"><span class="label-text font-semibold">Password</span></label>
-                    <input type="password" class="input input-bordered w-full" name="ldap_bind_password" id="ldapPass" placeholder="••••••••">
+                    <label class="label" for="ldapPass"><span class="label-text font-semibold">Password</span></label>
+                    <input type="password" class="input input-bordered w-full" name="ldap_bind_password" id="ldapPass" placeholder="Password…" autocomplete="new-password" spellcheck="false">
                     <span class="label-text-alt opacity-50 mt-1 block">Only needed if changing existing configuration</span>
                 </div>
                 
                 {% if ldap_config.get('base_dn') %}
                 <div class="mb-4 p-3 bg-base-200 border border-base-300 rounded-lg text-sm flex items-center justify-between">
                     <span class="opacity-60">Active Base DN:</span>
-                    <code class="text-xs font-semibold text-primary">{{ ldap_config.get('base_dn') }}</code>
+                    <code class="text-xs font-semibold text-primary tabular-nums">{{ ldap_config.get('base_dn') }}</code>
                 </div>
                 {% endif %}
                 
                 <div class="form-control w-full mb-6">
-                    <label class="label cursor-pointer justify-start gap-3">
+                    <label class="label cursor-pointer justify-start gap-3" for="ldapEnabled">
                         <input type="checkbox" class="checkbox checkbox-primary" name="ldap_enabled" id="ldapEnabled" {{ 'checked' if ldap_config.get('enabled') else '' }}>
                         <span class="label-text font-semibold">Enable LDAP Authentication</span>
                     </label>
                 </div>
                 <button type="submit" class="btn btn-primary w-full sm:w-auto text-white">
-                    <i data-lucide="save" class="w-4 h-4 mr-1"></i>Save Configuration
+                    <i data-lucide="save" class="w-4 h-4 mr-1" aria-hidden="true"></i>Save Configuration
                 </button>
             </form>
         </div>
@@ -1033,7 +1059,7 @@ function testLdap() {
     
     const resultDiv = document.getElementById('ldapTestResult');
     resultDiv.className = 'alert alert-info shadow-sm flex items-center gap-2';
-    resultDiv.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-600"></i>Testing connection and discovering Base DN...';
+    resultDiv.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-600" aria-hidden="true"></i>Testing connection and discovering Base DN…';
     resultDiv.classList.remove('hidden');
     if (window.lucide) { lucide.createIcons(); }
     
@@ -1046,13 +1072,13 @@ function testLdap() {
         .then(data => {
             if (data.success) {
                 resultDiv.className = 'alert alert-success shadow-sm flex items-center gap-2';
-                resultDiv.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4 text-green-600"></i>' + data.message;
+                resultDiv.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4 text-green-600" aria-hidden="true"></i>' + data.message;
                 if (data.base_dn) {
                     document.getElementById('discoveredBaseDn').value = data.base_dn;
                 }
             } else {
                 resultDiv.className = 'alert alert-danger shadow-sm flex items-center gap-2';
-                resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600"></i>' + data.message;
+                resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600" aria-hidden="true"></i>' + data.message;
                 if (!data.ldap_available) {
                     resultDiv.innerHTML += '<br><small>Install ldap3: <code>pip install ldap3</code></small>';
                 }
@@ -1061,9 +1087,26 @@ function testLdap() {
         })
         .catch(err => {
             resultDiv.className = 'alert alert-danger shadow-sm flex items-center gap-2';
-            resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600"></i>Connection test failed: ' + err;
+            resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600" aria-hidden="true"></i>Connection test failed: ' + err;
             if (window.lucide) { lucide.createIcons(); }
         });
+}
+
+// Warn before navigating with unsaved changes in LDAP Form
+let isFormDirty = false;
+const form = document.getElementById('ldapForm');
+if (form) {
+    const inputs = form.querySelectorAll('input:not([type="hidden"])');
+    inputs.forEach(input => {
+        input.addEventListener('input', () => { isFormDirty = true; });
+    });
+    window.addEventListener('beforeunload', (e) => {
+        if (isFormDirty) {
+            e.preventDefault();
+            e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        }
+    });
+    form.addEventListener('submit', () => { isFormDirty = false; });
 }
 </script>
 {% endblock %}
@@ -1137,7 +1180,7 @@ def web_login():
             local_user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
             
             if local_user:
-                print(f"[LOGIN] Found local user: {username}, checking password...")
+                print(f"[LOGIN] Found local user: {username}, checking password…")
                 if local_user['password'] == hash_password(password) and local_user['status'] == 1:
                     user = local_user
                     print(f"[LOGIN] Local auth SUCCESS for: {username}")

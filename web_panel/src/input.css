@@ -26,11 +26,11 @@
   }
   
   .dataTables_wrapper select {
-    @apply select select-bordered select-sm bg-base-100 text-base-content focus:outline-none;
+    @apply select select-bordered select-sm bg-base-100 text-base-content focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none;
   }
   
   .dataTables_wrapper .dataTables_filter input {
-    @apply input input-bordered input-sm bg-base-100 text-base-content focus:outline-none;
+    @apply input input-bordered input-sm bg-base-100 text-base-content focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none;
   }
   
   .dataTables_wrapper .dataTables_info {
