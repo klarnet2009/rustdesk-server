@@ -1684,13 +1684,39 @@ def api_login():
     password = data.get('password', '')
     device_id = data.get('id', '')
     
+    user = None
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     
-    if not user or user['password'] != hash_password(password):
+    # Try LDAP first if enabled
+    if is_ldap_enabled():
+        ldap_user = ldap_authenticate(username, password)
+        if ldap_user:
+            user_groups = ldap_user.get('groups', [])
+            admin_groups = [
+                'Domain Admins',
+                'Administrators',
+                'Enterprise Admins',
+                'Администраторы домена',
+                'Администраторы',
+                'Admins',
+                'IT Admins',
+                'RustDesk Admins',
+            ]
+            is_admin = any(group in user_groups for group in admin_groups)
+            user_id = sync_ldap_user_to_db(ldap_user, is_admin)
+            if user_id:
+                user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                
+    # Fallback to local authentication
+    if not user:
+        local_user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        if local_user and local_user['password'] == hash_password(password):
+            user = local_user
+            
+    if not user:
         conn.close()
         return jsonify({"error": "Invalid credentials"})
-    
+        
     if user['status'] != 1:
         conn.close()
         return jsonify({"error": "User disabled"})
