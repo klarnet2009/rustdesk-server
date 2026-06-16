@@ -33,7 +33,27 @@ module.exports = {
       }
     }
   },
-  plugins: [require("daisyui")]
+  plugins: [require("daisyui")],
+  daisyui: {
+    themes: [
+      {
+        corporate: {
+          ...require("daisyui/src/theming/themes")["corporate"],
+          primary: "#fd6a02",
+          "primary-content": "#ffffff",
+          accent: "#0d6efd",
+          "accent-content": "#ffffff",
+        },
+        business: {
+          ...require("daisyui/src/theming/themes")["business"],
+          primary: "#fd6a02",
+          "primary-content": "#ffffff",
+          accent: "#0d6efd",
+          "accent-content": "#ffffff",
+        },
+      },
+    ],
+  }
 }
 
 

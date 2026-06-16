@@ -4,6 +4,8 @@ LDAP/Active Directory Authentication Module
 
 import sqlite3
 
+import os
+
 # Try to import ldap3, if not available, provide stub
 try:
     from ldap3 import Server, Connection, ALL, NTLM, SIMPLE
@@ -12,7 +14,7 @@ except ImportError:
     LDAP_AVAILABLE = False
     print("[LDAP] ldap3 not installed. Run: pip install ldap3")
 
-DB_PATH = 'rustdesk.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rustdesk.db')
 
 
 def get_ldap_config():

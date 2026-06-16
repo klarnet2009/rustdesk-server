@@ -40,7 +40,7 @@ CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPT
 HOST = os.environ.get('API_HOST', '0.0.0.0')  # Listen on all interfaces
 PORT = int(os.environ.get('API_PORT', 21114))
 JWT_SECRET = 'rustdesk-api-jwt-secret'
-DB_PATH = 'rustdesk.db'
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rustdesk.db')
 
 # SSL Configuration
 SSL_ENABLED = os.environ.get('SSL_ENABLED', 'false').lower() == 'true'
@@ -177,92 +177,110 @@ def serve_static(filename):
 
 BASE_HTML = '''
 <!DOCTYPE html>
-<html lang="ru" class="light">
+<html lang="ru" data-theme="corporate">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - RustDesk Panel</title>
     <link href="/static/output.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-    <!-- Sidebar -->
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="/" class="sidebar-brand">
-                <i class="bi bi-display"></i>
-                RustDesk Panel
-            </a>
-        </div>
-        <ul class="sidebar-nav">
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('web_dashboard') }}">
-                    <i class="bi bi-speedometer2"></i>
-                    Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'devices' else '' }}" href="{{ url_for('web_devices') }}">
-                    <i class="bi bi-pc-display"></i>
-                    Devices
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'users' else '' }}" href="{{ url_for('web_users') }}">
-                    <i class="bi bi-people"></i>
-                    Users
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'logs' else '' }}" href="{{ url_for('web_logs') }}">
-                    <i class="bi bi-journal-text"></i>
-                    Logs
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'settings' else '' }}" href="{{ url_for('web_settings') }}">
-                    <i class="bi bi-gear"></i>
-                    Settings
-                </a>
-            </li>
-        </ul>
-        <div class="mt-auto p-4 border-t border-gray-200 dark:border-gray-700">
-            <small class="text-gray-500 dark:text-gray-400">RustDesk Panel v2.0</small>
-        </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="main-content">
-        <div class="top-navbar">
-            <button class="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" onclick="toggleSidebar()">
-                <i class="bi bi-list text-2xl"></i>
-            </button>
-            <div class="flex items-center gap-3">
-                <span class="text-gray-500 dark:text-gray-400">{{ current_time }}</span>
-            </div>
-            <div class="flex items-center gap-3">
-                <button class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" onclick="toggleTheme()" title="Toggle Theme">
-                    <i class="bi bi-moon-stars text-xl" id="themeIcon"></i>
-                </button>
-                <div class="relative">
-                    <button class="user-dropdown flex items-center gap-2" onclick="toggleDropdown('userDropdown')">
-                        <i class="bi bi-person-circle"></i>
-                        {{ session.username }}
-                        <i class="bi bi-chevron-down text-xs"></i>
+<body class="min-h-screen bg-base-200">
+    <div class="drawer lg:drawer-open">
+        <input id="sidebar-drawer" type="checkbox" class="drawer-toggle" />
+        
+        <div class="drawer-content flex flex-col min-h-screen">
+            <!-- Top Navbar -->
+            <div class="navbar bg-base-100 border-b border-base-300 px-6 justify-between shadow-sm z-10">
+                <div class="flex-none lg:hidden">
+                    <label for="sidebar-drawer" class="btn btn-square btn-ghost">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    </label>
+                </div>
+                <div class="flex-grow">
+                    <span class="text-sm opacity-60">{{ current_time }}</span>
+                </div>
+                <div class="flex-none gap-2">
+                    <!-- Theme Toggle -->
+                    <button class="btn btn-ghost btn-circle" onclick="toggleTheme()" title="Toggle Theme" id="themeIconContainer">
+                        <i data-lucide="moon" class="w-5 h-5"></i>
                     </button>
-                    <div id="userDropdown" class="dropdown-menu">
-                        <a class="dropdown-item" href="{{ url_for('web_logout') }}">
-                            <i class="bi bi-box-arrow-right mr-2"></i>Logout
-                        </a>
+                    
+                    <!-- User Dropdown -->
+                    <div class="dropdown dropdown-end">
+                        <div tabindex="0" role="button" class="btn btn-ghost m-1 flex items-center gap-2 normal-case font-medium">
+                            <i data-lucide="user" class="w-5 h-5 opacity-70"></i>
+                            {{ session.username }}
+                            <i data-lucide="chevron-down" class="w-4 h-4 opacity-50"></i>
+                        </div>
+                        <ul tabindex="0" class="dropdown-content z-[30] menu p-2 shadow bg-base-100 rounded-box w-52 border border-base-300 mt-2">
+                            <li>
+                                <a href="{{ url_for('web_logout') }}" class="text-error">
+                                    <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+                                </a>
+                            </li>
+                        </ul>
                     </div>
                 </div>
             </div>
+
+            <!-- Content Area -->
+            <div class="p-6 flex-grow bg-base-200">
+                {% block content %}{% endblock %}
+            </div>
         </div>
 
-        <div class="content-area">
-            {% block content %}{% endblock %}
+        <!-- Sidebar -->
+        <div class="drawer-side z-20">
+            <label for="sidebar-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+            <div class="p-4 w-80 min-h-full bg-base-100 border-r border-base-300 text-base-content flex flex-col">
+                <!-- Brand -->
+                <div class="px-4 py-3 border-b border-base-300 mb-4">
+                    <a href="/" class="flex items-center gap-2 text-xl font-bold text-base-content no-underline">
+                        <i data-lucide="monitor" class="text-primary w-6 h-6"></i>
+                        <span>RustDesk Panel</span>
+                    </a>
+                </div>
+                <!-- Nav Links -->
+                <ul class="menu menu-vertical p-0 gap-1 flex-grow">
+                    <li>
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'dashboard' else '' }}" href="{{ url_for('web_dashboard') }}">
+                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'devices' else '' }}" href="{{ url_for('web_devices') }}">
+                            <i data-lucide="monitor" class="w-5 h-5"></i>
+                            Devices
+                        </a>
+                    </li>
+                    <li>
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'users' else '' }}" href="{{ url_for('web_users') }}">
+                            <i data-lucide="users" class="w-5 h-5"></i>
+                            Users
+                        </a>
+                    </li>
+                    <li>
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'logs' else '' }}" href="{{ url_for('web_logs') }}">
+                            <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                            Logs
+                        </a>
+                    </li>
+                    <li>
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'settings' else '' }}" href="{{ url_for('web_settings') }}">
+                            <i data-lucide="settings" class="w-5 h-5"></i>
+                            Settings
+                        </a>
+                    </li>
+                </ul>
+                <!-- Footer -->
+                <div class="mt-auto pt-4 border-t border-base-300">
+                    <small class="text-base-content/60">RustDesk Panel v2.0</small>
+                </div>
+            </div>
         </div>
-    </main>
+    </div>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
@@ -271,16 +289,11 @@ BASE_HTML = '''
         // Theme toggle
         function toggleTheme() {
             const html = document.documentElement;
-            const isDark = html.classList.contains('dark');
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'business' ? 'corporate' : 'business';
             
-            if (isDark) {
-                html.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                html.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
             updateThemeIcon();
             
             // Reload for charts if they exist
@@ -290,64 +303,26 @@ BASE_HTML = '''
         }
 
         function updateThemeIcon() {
-            const icon = document.getElementById('themeIcon');
-            const isDark = document.documentElement.classList.contains('dark');
-            icon.className = isDark ? 'bi bi-sun text-xl' : 'bi bi-moon-stars text-xl';
+            const iconContainer = document.getElementById('themeIconContainer');
+            if (iconContainer) {
+                const isDark = document.documentElement.getAttribute('data-theme') === 'business';
+                iconContainer.innerHTML = isDark 
+                    ? '<i data-lucide="sun" class="w-5 h-5"></i>' 
+                    : '<i data-lucide="moon" class="w-5 h-5"></i>';
+                if (window.lucide) {
+                    lucide.createIcons();
+                }
+            }
         }
 
         // Init theme from localStorage
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        if (savedTheme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-        updateThemeIcon();
-
-        // Sidebar toggle (mobile)
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('show');
-        }
-
-        // Dropdown toggle
-        function toggleDropdown(id) {
-            const dropdown = document.getElementById(id);
-            dropdown.classList.toggle('show');
-        }
-
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.relative')) {
-                document.querySelectorAll('.dropdown-menu.show').forEach(d => d.classList.remove('show'));
-            }
-        });
-
-        // Modal functions
-        function openModal(id) {
-            document.getElementById(id).classList.add('show');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).classList.remove('show');
-            document.body.style.overflow = '';
-        }
-
-        // Close modal on backdrop click
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('modal-backdrop')) {
-                e.target.classList.remove('show');
-                document.body.style.overflow = '';
-            }
-        });
-
-        // Close modal on Escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                document.querySelectorAll('.modal-backdrop.show').forEach(m => {
-                    m.classList.remove('show');
-                    document.body.style.overflow = '';
-                });
+        const savedTheme = localStorage.getItem('theme') || 'corporate';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            updateThemeIcon();
+            if (window.lucide) {
+                lucide.createIcons();
             }
         });
     </script>
@@ -358,50 +333,66 @@ BASE_HTML = '''
 
 LOGIN_HTML = '''
 <!DOCTYPE html>
-<html lang="ru" class="light">
+<html lang="ru" data-theme="corporate">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - RustDesk Panel</title>
     <link href="/static/output.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
-    <div class="login-card">
-        <div class="text-center mb-6">
-            <i class="bi bi-display login-logo"></i>
-            <h3 class="mt-4 text-2xl font-bold text-gray-900 dark:text-white">RustDesk Panel</h3>
-            <p class="text-gray-500 dark:text-gray-400 mt-2">Sign in to your account</p>
+<body class="min-h-screen bg-base-200 flex items-center justify-center">
+    <div class="card w-96 bg-base-100 shadow-xl border border-base-300">
+        <div class="card-body p-8">
+            <div class="flex flex-col items-center mb-6">
+                <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                    <i data-lucide="monitor" class="w-8 h-8 text-primary"></i>
+                </div>
+                <h2 class="card-title text-2xl font-bold text-base-content">RustDesk Panel</h2>
+                <p class="text-sm text-base-content/60">Sign in to your account</p>
+            </div>
+            
+            {% if error %}
+            <div class="alert alert-error shadow-sm mb-4">
+                <i data-lucide="alert-circle" class="w-5 h-5 text-white"></i>
+                <span class="text-sm font-semibold text-white">{{ error }}</span>
+            </div>
+            {% endif %}
+            
+            <form method="POST" class="space-y-4">
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text font-semibold">Username</span></label>
+                    <label class="input input-bordered flex items-center gap-2">
+                        <i data-lucide="user" class="w-4 h-4 opacity-50"></i>
+                        <input type="text" class="grow" name="username" placeholder="Username" required autofocus />
+                    </label>
+                </div>
+                
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text font-semibold">Password</span></label>
+                    <label class="input input-bordered flex items-center gap-2">
+                        <i data-lucide="lock" class="w-4 h-4 opacity-50"></i>
+                        <input type="password" class="grow" name="password" placeholder="Password" required />
+                    </label>
+                </div>
+                
+                <div class="card-actions justify-end mt-6">
+                    <button type="submit" class="btn btn-primary w-full text-white">
+                        <i data-lucide="log-in" class="w-4 h-4"></i> Sign In
+                    </button>
+                </div>
+            </form>
         </div>
-        {% if error %}
-        <div class="alert alert-danger">{{ error }}</div>
-        {% endif %}
-        <form method="POST">
-            <div class="mb-4">
-                <label class="form-label">Username</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-person"></i></span>
-                    <input type="text" class="form-control rounded-l-none" name="username" required autofocus>
-                </div>
-            </div>
-            <div class="mb-6">
-                <label class="form-label">Password</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                    <input type="password" class="form-control rounded-l-none" name="password" required>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary w-full py-3">
-                <i class="bi bi-box-arrow-in-right mr-2"></i>Sign In
-            </button>
-        </form>
     </div>
     <script>
         // Init theme
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        if (savedTheme === 'dark') {
-            document.documentElement.classList.add('dark');
-        }
+        const savedTheme = localStorage.getItem('theme') || 'corporate';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        });
     </script>
 </body>
 </html>
@@ -410,51 +401,62 @@ LOGIN_HTML = '''
 DASHBOARD_HTML = '''
 {% extends "base" %}
 {% block content %}
-<h4 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">Dashboard</h4>
+<h4 class="text-xl font-semibold text-base-content mb-6">Dashboard</h4>
 
 <!-- Stats -->
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-    <div class="stat-card">
-        <div class="flex items-center">
-            <div class="stat-icon bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mr-4">
-                <i class="bi bi-pc-display"></i>
+    <div class="stats shadow bg-base-100 border border-base-300 p-2">
+        <div class="stat flex items-center gap-4">
+            <div class="stat-figure text-primary">
+                <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center">
+                    <i data-lucide="monitor" class="w-6 h-6"></i>
+                </div>
             </div>
             <div>
-                <div class="stat-value">{{ stats.total }}</div>
-                <div class="text-gray-500 dark:text-gray-400">Total Devices</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1">{{ stats.total }}</div>
+                <div class="stat-title text-sm opacity-60">Total Devices</div>
             </div>
         </div>
     </div>
-    <div class="stat-card">
-        <div class="flex items-center">
-            <div class="stat-icon bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 mr-4">
-                <i class="bi bi-wifi"></i>
+    
+    <div class="stats shadow bg-base-100 border border-base-300 p-2">
+        <div class="stat flex items-center gap-4">
+            <div class="stat-figure text-success">
+                <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg flex items-center justify-center">
+                    <i data-lucide="wifi" class="w-6 h-6"></i>
+                </div>
             </div>
             <div>
-                <div class="stat-value">{{ stats.online }}</div>
-                <div class="text-gray-500 dark:text-gray-400">Online Now</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1">{{ stats.online }}</div>
+                <div class="stat-title text-sm opacity-60">Online Now</div>
             </div>
         </div>
     </div>
-    <div class="stat-card">
-        <div class="flex items-center">
-            <div class="stat-icon bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 mr-4">
-                <i class="bi bi-arrow-left-right"></i>
+    
+    <div class="stats shadow bg-base-100 border border-base-300 p-2">
+        <div class="stat flex items-center gap-4">
+            <div class="stat-figure text-secondary">
+                <div class="w-12 h-12 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 rounded-lg flex items-center justify-center">
+                    <i data-lucide="arrow-left-right" class="w-6 h-6"></i>
+                </div>
             </div>
             <div>
-                <div class="stat-value">{{ stats.connections_today }}</div>
-                <div class="text-gray-500 dark:text-gray-400">Connections Today</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1">{{ stats.connections_today }}</div>
+                <div class="stat-title text-sm opacity-60">Connections Today</div>
             </div>
         </div>
     </div>
-    <div class="stat-card">
-        <div class="flex items-center">
-            <div class="stat-icon bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 mr-4">
-                <i class="bi bi-people"></i>
+    
+    <div class="stats shadow bg-base-100 border border-base-300 p-2">
+        <div class="stat flex items-center gap-4">
+            <div class="stat-figure text-warning">
+                <div class="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg flex items-center justify-center">
+                    <i data-lucide="users" class="w-6 h-6"></i>
+                </div>
             </div>
             <div>
-                <div class="stat-value">{{ stats.users }}</div>
-                <div class="text-gray-500 dark:text-gray-400">Users</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1">{{ stats.users }}</div>
+                <div class="stat-title text-sm opacity-60">Users</div>
             </div>
         </div>
     </div>
@@ -462,22 +464,18 @@ DASHBOARD_HTML = '''
 
 <!-- Charts -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-    <div class="lg:col-span-2 card-custom">
-        <div class="card-header flex justify-between items-center">
-            <h6 class="font-semibold text-gray-900 dark:text-white">Connections (Last 7 Days)</h6>
-        </div>
-        <div class="card-body">
-            <div class="chart-container">
+    <div class="lg:col-span-2 card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card-body p-5">
+            <h2 class="card-title text-base font-semibold">Connections (Last 7 Days)</h2>
+            <div class="relative h-72">
                 <canvas id="connectionsChart"></canvas>
             </div>
         </div>
     </div>
-    <div class="card-custom">
-        <div class="card-header">
-            <h6 class="font-semibold text-gray-900 dark:text-white">OS Distribution</h6>
-        </div>
-        <div class="card-body">
-            <div class="chart-container">
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card-body p-5">
+            <h2 class="card-title text-base font-semibold">OS Distribution</h2>
+            <div class="relative h-72">
                 <canvas id="osChart"></canvas>
             </div>
         </div>
@@ -485,48 +483,55 @@ DASHBOARD_HTML = '''
 </div>
 
 <!-- Recent Devices -->
-<div class="card-custom">
-    <div class="card-header flex justify-between items-center">
-        <h6 class="font-semibold text-gray-900 dark:text-white">Recent Devices</h6>
-        <a href="{{ url_for('web_devices') }}" class="btn btn-outline btn-sm">View All</a>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead>
-                <tr class="bg-gray-50 dark:bg-gray-800/50">
-                    <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">ID</th>
-                    <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Hostname</th>
-                    <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">User</th>
-                    <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">OS</th>
-                    <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">IP</th>
-                    <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Last Seen</th>
-                    <th class="text-left px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for d in devices[:10] %}
-                <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                    <td class="px-4 py-3"><span class="device-id">{{ d.id }}</span></td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ d.hostname or '-' }}</td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ d.username or '-' }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ d.os_short }}</td>
-                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ d.ip or '-' }}</td>
-                    <td class="px-4 py-3">
-                        <span class="{{ 'badge-online' if d.online else 'badge-offline' }}">
-                            {{ 'Online' if d.online else 'Offline' }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ d.last_seen_str }}</td>
-                    <td class="px-4 py-3">
-                        <button class="btn btn-primary btn-connect" onclick="connectTo('{{ d.id }}')">
-                            <i class="bi bi-link-45deg"></i> Connect
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="card bg-base-100 border border-base-300 shadow-sm">
+    <div class="card-body p-0">
+        <div class="p-5 flex justify-between items-center border-b border-base-300">
+            <h2 class="card-title text-base font-semibold">Recent Devices</h2>
+            <a href="{{ url_for('web_devices') }}" class="btn btn-outline btn-sm">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Hostname</th>
+                        <th>User</th>
+                        <th>OS</th>
+                        <th>IP</th>
+                        <th>Status</th>
+                        <th>Last Seen</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in devices[:10] %}
+                    <tr class="hover">
+                        <td><span class="font-mono font-semibold text-primary">{{ d.id }}</span></td>
+                        <td>{{ d.hostname or '-' }}</td>
+                        <td>{{ d.username or '-' }}</td>
+                        <td>{{ d.os_short }}</td>
+                        <td>{{ d.ip or '-' }}</td>
+                        <td>
+                            {% if d.online %}
+                            <span class="badge badge-success gap-1 text-white text-xs font-semibold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                Online
+                            </span>
+                            {% else %}
+                            <span class="badge badge-ghost text-xs font-semibold">Offline</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ d.last_seen_str }}</td>
+                        <td>
+                            <button class="btn btn-primary btn-sm text-white" onclick="connectTo('{{ d.id }}')">
+                                <i data-lucide="link" class="w-4 h-4"></i> Connect
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -538,9 +543,11 @@ function connectTo(id) {
 }
 
 // Get theme colors
-const isDark = document.documentElement.classList.contains('dark');
+const htmlAttr = document.documentElement.getAttribute('data-theme');
+const isDark = htmlAttr === 'business';
 const gridColor = isDark ? '#374151' : '#e5e7eb';
 const textColor = isDark ? '#9ca3af' : '#6b7280';
+const primaryColor = '#fd6a02';
 
 // Connections Chart
 const connCtx = document.getElementById('connectionsChart').getContext('2d');
@@ -551,8 +558,8 @@ new Chart(connCtx, {
         datasets: [{
             label: 'Connections',
             data: {{ chart_data | safe }},
-            borderColor: '#0d6efd',
-            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+            borderColor: primaryColor,
+            backgroundColor: 'rgba(253, 106, 2, 0.1)',
             fill: true,
             tension: 0.4
         }]
@@ -576,7 +583,7 @@ new Chart(osCtx, {
         labels: {{ os_labels | safe }},
         datasets: [{
             data: {{ os_data | safe }},
-            backgroundColor: ['#0d6efd', '#10b981', '#f59e0b', '#ef4444', '#6b7280']
+            backgroundColor: ['#fd6a02', '#0d6efd', '#10b981', '#f59e0b', '#ef4444']
         }]
     },
     options: {
@@ -593,71 +600,79 @@ DEVICES_HTML = '''
 {% extends "base" %}
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h4 class="text-xl font-semibold text-gray-900 dark:text-white">Devices</h4>
-    <button class="btn btn-primary" onclick="location.reload()">
-        <i class="bi bi-arrow-clockwise mr-2"></i>Refresh
+    <h4 class="text-xl font-semibold text-base-content">Devices</h4>
+    <button class="btn btn-primary text-white" onclick="location.reload()">
+        <i data-lucide="rotate-cw" class="w-4 h-4 mr-2"></i>Refresh
     </button>
 </div>
 
-<div class="card-custom">
-    <div class="card-body">
-        <table id="devicesTable" class="dataTable w-full">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Hostname</th>
-                    <th>Username</th>
-                    <th>OS</th>
-                    <th>IP Address</th>
-                    <th>Version</th>
-                    <th>Status</th>
-                    <th>Last Seen</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for d in devices %}
-                <tr>
-                    <td><span class="device-id">{{ d.id }}</span></td>
-                    <td>{{ d.hostname or '-' }}</td>
-                    <td>{{ d.username or '-' }}</td>
-                    <td class="text-sm">{{ d.os_short }}</td>
-                    <td>{{ d.ip or '-' }}</td>
-                    <td>{{ d.version or '-' }}</td>
-                    <td>
-                        <span class="{{ 'badge-online' if d.online else 'badge-offline' }}">
-                            {{ 'Online' if d.online else 'Offline' }}
-                        </span>
-                    </td>
-                    <td class="text-sm">{{ d.last_seen_str }}</td>
-                    <td>
-                        <button class="btn btn-primary btn-sm" onclick="connectTo('{{ d.id }}')" title="Connect">
-                            <i class="bi bi-link-45deg"></i>
-                        </button>
-                        <button class="btn btn-outline btn-sm" onclick="showDetails('{{ d.id }}')" title="Details">
-                            <i class="bi bi-info-circle"></i>
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="card bg-base-100 border border-base-300 shadow-sm">
+    <div class="card-body p-6">
+        <div class="overflow-x-auto">
+            <table id="devicesTable" class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Hostname</th>
+                        <th>Username</th>
+                        <th>OS</th>
+                        <th>IP Address</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Last Seen</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in devices %}
+                    <tr class="hover">
+                        <td><span class="font-mono font-semibold text-primary">{{ d.id }}</span></td>
+                        <td>{{ d.hostname or '-' }}</td>
+                        <td>{{ d.username or '-' }}</td>
+                        <td>{{ d.os_short }}</td>
+                        <td>{{ d.ip or '-' }}</td>
+                        <td>{{ d.version or '-' }}</td>
+                        <td>
+                            {% if d.online %}
+                            <span class="badge badge-success gap-1 text-white text-xs font-semibold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                Online
+                            </span>
+                            {% else %}
+                            <span class="badge badge-ghost text-xs font-semibold">Offline</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ d.last_seen_str }}</td>
+                        <td class="flex gap-1">
+                            <button class="btn btn-primary btn-sm btn-square text-white" onclick="connectTo('{{ d.id }}')" title="Connect">
+                                <i data-lucide="link" class="w-4 h-4"></i>
+                            </button>
+                            <button class="btn btn-outline btn-sm btn-square" onclick="showDetails('{{ d.id }}')" title="Details">
+                                <i data-lucide="info" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <!-- Device Details Modal -->
-<div class="modal-backdrop" id="detailsModal">
-    <div class="modal">
-        <div class="modal-header">
-            <h5 class="modal-title">Device Details</h5>
-            <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" onclick="closeModal('detailsModal')">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-        <div class="modal-body" id="detailsBody">
+<dialog id="detailsModal" class="modal">
+    <div class="modal-box">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="font-bold text-lg mb-4">Device Details</h3>
+        <div id="detailsBody">
         </div>
     </div>
-</div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
@@ -666,6 +681,9 @@ $(document).ready(function() {
     $('#devicesTable').DataTable({
         order: [[7, 'desc']],
         pageLength: 25,
+        search: {
+            search: {{ search_query | tojson }}
+        },
         language: {
             search: "Search:",
             lengthMenu: "Show _MENU_ devices"
@@ -677,28 +695,35 @@ function connectTo(id) {
     window.location.href = 'rustdesk://connection/new/' + id;
 }
 
-const devices = {{ devices_json | safe }};
+const devices = {{ devices | tojson }};
 
 function showDetails(id) {
     const d = devices.find(x => x.id === id);
     if (!d) return;
     document.getElementById('detailsBody').innerHTML = `
-        <table class="w-full text-sm">
-            <tr class="border-b border-gray-200 dark:border-gray-700"><th class="py-2 text-left text-gray-600 dark:text-gray-400 w-24">ID</th><td class="py-2"><code class="device-id">${d.id}</code></td></tr>
-            <tr class="border-b border-gray-200 dark:border-gray-700"><th class="py-2 text-left text-gray-600 dark:text-gray-400">Hostname</th><td class="py-2">${d.hostname || '-'}</td></tr>
-            <tr class="border-b border-gray-200 dark:border-gray-700"><th class="py-2 text-left text-gray-600 dark:text-gray-400">Username</th><td class="py-2">${d.username || '-'}</td></tr>
-            <tr class="border-b border-gray-200 dark:border-gray-700"><th class="py-2 text-left text-gray-600 dark:text-gray-400">OS</th><td class="py-2">${d.os || '-'}</td></tr>
-            <tr class="border-b border-gray-200 dark:border-gray-700"><th class="py-2 text-left text-gray-600 dark:text-gray-400">IP</th><td class="py-2">${d.ip || '-'}</td></tr>
-            <tr class="border-b border-gray-200 dark:border-gray-700"><th class="py-2 text-left text-gray-600 dark:text-gray-400">CPU</th><td class="py-2">${d.cpu || '-'}</td></tr>
-            <tr class="border-b border-gray-200 dark:border-gray-700"><th class="py-2 text-left text-gray-600 dark:text-gray-400">Memory</th><td class="py-2">${d.memory || '-'}</td></tr>
-            <tr class="border-b border-gray-200 dark:border-gray-700"><th class="py-2 text-left text-gray-600 dark:text-gray-400">Version</th><td class="py-2">${d.version || '-'}</td></tr>
-            <tr><th class="py-2 text-left text-gray-600 dark:text-gray-400">Last Seen</th><td class="py-2">${d.last_seen_str}</td></tr>
-        </table>
-        <button class="btn btn-primary w-full mt-4" onclick="connectTo('${d.id}')">
-            <i class="bi bi-link-45deg mr-2"></i>Connect
+        <div class="overflow-x-auto">
+            <table class="table table-compact w-full text-sm">
+                <tbody>
+                    <tr class="border-b border-base-200"><th class="w-24 opacity-60">ID</th><td><code class="font-mono font-semibold text-primary">${d.id}</code></td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Hostname</th><td>${d.hostname || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Username</th><td>${d.username || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">OS</th><td>${d.os || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">IP</th><td>${d.ip || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">CPU</th><td>${d.cpu || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Memory</th><td>${d.memory || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Version</th><td>${d.version || '-'}</td></tr>
+                    <tr><th class="opacity-60">Last Seen</th><td>${d.last_seen_str}</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <button class="btn btn-primary w-full mt-4 text-white" onclick="connectTo('${d.id}')">
+            <i data-lucide="link" class="w-4 h-4 mr-2"></i>Connect
         </button>
     `;
-    openModal('detailsModal');
+    document.getElementById('detailsModal').showModal();
+    if (window.lucide) {
+        lucide.createIcons();
+    }
 }
 </script>
 {% endblock %}
@@ -708,90 +733,97 @@ USERS_HTML = '''
 {% extends "base" %}
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h4 class="text-xl font-semibold text-gray-900 dark:text-white">Users</h4>
-    <button class="btn btn-primary" onclick="openModal('addUserModal')">
-        <i class="bi bi-plus-lg mr-2"></i>Add User
+    <h1 class="text-2xl font-bold text-base-content">Users</h1>
+    <button class="btn btn-primary text-white" onclick="document.getElementById('addUserModal').showModal()">
+        <i data-lucide="user-plus" class="w-4 h-4 mr-2"></i>Add User
     </button>
 </div>
 
-<div class="card-custom">
-    <div class="card-body">
-        <table id="usersTable" class="dataTable w-full">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for u in users %}
-                <tr>
-                    <td>{{ u.id }}</td>
-                    <td><i class="bi bi-person-circle mr-2 text-gray-400"></i>{{ u.username }}</td>
-                    <td>{{ u.email or '-' }}</td>
-                    <td>
-                        <span class="text-xs font-medium px-2.5 py-1 rounded {{ 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' if u.is_admin else 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
-                            {{ 'Admin' if u.is_admin else 'User' }}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="text-xs font-medium px-2.5 py-1 rounded {{ 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' if u.status == 1 else 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
-                            {{ 'Active' if u.status == 1 else 'Disabled' }}
-                        </span>
-                    </td>
-                    <td class="text-sm">{{ u.created_at }}</td>
-                    <td>
-                        <button class="btn btn-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onclick="deleteUser({{ u.id }})" {{ 'disabled' if u.username == 'admin' else '' }}>
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="card bg-base-100 border border-base-300 shadow-sm">
+    <div class="card-body p-6">
+        <div class="overflow-x-auto">
+            <table id="usersTable" class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr class="hover">
+                        <td>{{ u.id }}</td>
+                        <td class="font-medium flex items-center gap-2"><i data-lucide="user" class="w-4 h-4 text-base-content/40"></i>{{ u.username }}</td>
+                        <td>{{ u.email or '-' }}</td>
+                        <td>
+                            {% if u.is_admin %}
+                            <span class="badge badge-error text-white text-xs font-semibold">Admin</span>
+                            {% else %}
+                            <span class="badge badge-ghost text-xs font-semibold">User</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.status == 1 %}
+                            <span class="badge badge-success text-white text-xs font-semibold">Active</span>
+                            {% else %}
+                            <span class="badge badge-ghost text-xs font-semibold">Disabled</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-sm opacity-70">{{ u.created_at }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-ghost text-red-600 {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick="deleteUser({{ u.id }})" {{ 'disabled' if u.username == 'admin' else '' }}>
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <!-- Add User Modal -->
-<div class="modal-backdrop" id="addUserModal">
-    <div class="modal">
-        <div class="modal-header">
-            <h5 class="modal-title">Add User</h5>
-            <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" onclick="closeModal('addUserModal')">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
+<dialog id="addUserModal" class="modal">
+    <div class="modal-box">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="font-bold text-lg mb-4">Add User</h3>
         <form action="{{ url_for('web_add_user') }}" method="POST">
-            <div class="modal-body">
-                <div class="mb-4">
-                    <label class="form-label">Username</label>
-                    <input type="text" class="form-control" name="username" required>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Email</label>
-                    <input type="email" class="form-control" name="email">
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Password</label>
-                    <input type="password" class="form-control" name="password" required>
-                </div>
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" name="is_admin" id="isAdmin">
-                    <label class="form-check-label" for="isAdmin">Administrator</label>
-                </div>
+            <div class="form-control w-full mb-4">
+                <label class="label"><span class="label-text font-semibold">Username</span></label>
+                <input type="text" class="input input-bordered w-full" name="username" required>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
+            <div class="form-control w-full mb-4">
+                <label class="label"><span class="label-text font-semibold">Email</span></label>
+                <input type="email" class="input input-bordered w-full" name="email">
+            </div>
+            <div class="form-control w-full mb-4">
+                <label class="label"><span class="label-text font-semibold">Password</span></label>
+                <input type="password" class="input input-bordered w-full" name="password" required>
+            </div>
+            <div class="form-control w-full mb-6">
+                <label class="label cursor-pointer justify-start gap-3">
+                    <input type="checkbox" class="checkbox checkbox-primary" name="is_admin" id="isAdmin">
+                    <span class="label-text font-semibold">Administrator</span>
+                </label>
+            </div>
+            <div class="flex justify-end gap-3 mt-4">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('addUserModal').close()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Add User</button>
             </div>
         </form>
     </div>
-</div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
@@ -806,6 +838,8 @@ function deleteUser(id) {
             .then(() => location.reload());
     }
 }
+
+// openModal is no longer needed since we use native dialog.showModal()
 </script>
 {% endblock %}
 '''
@@ -814,47 +848,51 @@ LOGS_HTML = '''
 {% extends "base" %}
 {% block content %}
 <div class="flex justify-between items-center mb-6">
-    <h4 class="text-xl font-semibold text-gray-900 dark:text-white">Audit Logs</h4>
-    <div class="flex gap-1">
-        <button class="btn {{ 'btn-primary' if log_type == 'all' else 'btn-outline' }} btn-sm" onclick="location.href='?type=all'">All</button>
-        <button class="btn {{ 'btn-primary' if log_type == 'conn' else 'btn-outline' }} btn-sm" onclick="location.href='?type=conn'">Connections</button>
-        <button class="btn {{ 'btn-primary' if log_type == 'file' else 'btn-outline' }} btn-sm" onclick="location.href='?type=file'">Files</button>
-        <button class="btn {{ 'btn-primary' if log_type == 'alarm' else 'btn-outline' }} btn-sm" onclick="location.href='?type=alarm'">Alarms</button>
+    <h1 class="text-2xl font-bold text-base-content">Audit Logs</h1>
+    <div class="join">
+        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'all' else 'btn-outline' }}" onclick="location.href='?type=all'">All</button>
+        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'conn' else 'btn-outline' }}" onclick="location.href='?type=conn'">Connections</button>
+        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'file' else 'btn-outline' }}" onclick="location.href='?type=file'">Files</button>
+        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'alarm' else 'btn-outline' }}" onclick="location.href='?type=alarm'">Alarms</button>
     </div>
 </div>
 
-<div class="card-custom">
-    <div class="card-body">
-        <table id="logsTable" class="dataTable w-full">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Device ID</th>
-                    <th>Peer ID</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for log in logs %}
-                <tr>
-                    <td class="text-sm">{{ log.created_at }}</td>
-                    <td>
-                        <span class="text-xs font-medium px-2.5 py-1 rounded 
-                            {{ 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' if log.type == 'conn' else 
-                               'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' if log.type == 'file' else 
-                               'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' if log.type == 'alarm' else 
-                               'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
-                            {{ log.type }}
-                        </span>
-                    </td>
-                    <td><code class="text-sm text-gray-600 dark:text-gray-400">{{ log.device_id or '-' }}</code></td>
-                    <td><code class="text-sm text-gray-600 dark:text-gray-400">{{ log.peer_id or '-' }}</code></td>
-                    <td>{{ log.action or '-' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="card bg-base-100 border border-base-300 shadow-sm">
+    <div class="card-body p-6">
+        <div class="overflow-x-auto">
+            <table id="logsTable" class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Device ID</th>
+                        <th>Peer ID</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr class="hover">
+                        <td class="text-sm opacity-75">{{ log.created_at }}</td>
+                        <td>
+                            {% if log.type == 'conn' %}
+                            <span class="badge badge-accent text-white text-xs font-semibold">conn</span>
+                            {% elif log.type == 'file' %}
+                            <span class="badge badge-warning text-white text-xs font-semibold">file</span>
+                            {% elif log.type == 'alarm' %}
+                            <span class="badge badge-error text-white text-xs font-semibold">alarm</span>
+                            {% else %}
+                            <span class="badge badge-ghost text-xs font-semibold">{{ log.type }}</span>
+                            {% endif %}
+                        </td>
+                        <td><code class="font-mono text-sm opacity-80">{{ log.device_id or '-' }}</code></td>
+                        <td><code class="font-mono text-sm opacity-80">{{ log.peer_id or '-' }}</code></td>
+                        <td>{{ log.action or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -874,99 +912,106 @@ $(document).ready(function() {
 SETTINGS_HTML = '''
 {% extends "base" %}
 {% block content %}
-<h4 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">Settings</h4>
+<h1 class="text-2xl font-bold text-base-content mb-6">Settings</h1>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div class="space-y-6">
-        <div class="card-custom">
-            <div class="card-header">
-                <h6 class="font-semibold text-gray-900 dark:text-white"><i class="bi bi-server mr-2"></i>Server Configuration</h6>
-            </div>
-            <div class="card-body">
-                <div class="mb-4">
-                    <label class="form-label">ID Server</label>
-                    <input type="text" class="form-control bg-gray-50 dark:bg-gray-700" value="10.21.31.11" disabled>
+        <div class="card bg-base-100 border border-base-300 shadow-sm">
+            <div class="card-body p-6">
+                <h2 class="card-title text-base font-semibold border-b border-base-200 pb-3 mb-4"><i data-lucide="server" class="text-primary w-5 h-5 mr-2"></i>Server Configuration</h2>
+                <div class="form-control w-full mb-4">
+                    <label class="label"><span class="label-text opacity-70">ID Server</span></label>
+                    <input type="text" class="input input-bordered w-full bg-base-200" value="10.21.31.11" disabled>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label">Relay Server</label>
-                    <input type="text" class="form-control bg-gray-50 dark:bg-gray-700" value="10.21.31.11" disabled>
+                <div class="form-control w-full mb-4">
+                    <label class="label"><span class="label-text opacity-70">Relay Server</span></label>
+                    <input type="text" class="input input-bordered w-full bg-base-200" value="10.21.31.11" disabled>
                 </div>
-                <div>
-                    <label class="form-label">API Server</label>
-                    <input type="text" class="form-control bg-gray-50 dark:bg-gray-700" value="http://{{ request.host }}" disabled>
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text opacity-70">API Server</span></label>
+                    <input type="text" class="input input-bordered w-full bg-base-200" value="http://{{ request.host }}" disabled>
                 </div>
             </div>
         </div>
         
-        <div class="card-custom">
-            <div class="card-header">
-                <h6 class="font-semibold text-gray-900 dark:text-white"><i class="bi bi-info-circle mr-2"></i>System Info</h6>
-            </div>
-            <div class="card-body">
-                <table class="w-full text-sm">
-                    <tr class="border-b border-gray-200 dark:border-gray-700">
-                        <td class="py-2 text-gray-600 dark:text-gray-400">LDAP Library</td>
-                        <td class="py-2 text-right">
-                            <span class="text-xs font-medium px-2.5 py-1 rounded {{ 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' if ldap_available else 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
-                                {{ 'Installed' if ldap_available else 'Not installed' }}
-                            </span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="py-2 text-gray-600 dark:text-gray-400">LDAP Status</td>
-                        <td class="py-2 text-right">
-                            <span class="text-xs font-medium px-2.5 py-1 rounded {{ 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' if ldap_config.get('enabled') else 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
-                                {{ 'Enabled' if ldap_config.get('enabled') else 'Disabled' }}
-                            </span>
-                        </td>
-                    </tr>
-                </table>
+        <div class="card bg-base-100 border border-base-300 shadow-sm">
+            <div class="card-body p-6">
+                <h2 class="card-title text-base font-semibold border-b border-base-200 pb-3 mb-4"><i data-lucide="info" class="text-primary w-5 h-5 mr-2"></i>System Info</h2>
+                <div class="overflow-x-auto">
+                    <table class="table table-compact w-full text-sm">
+                        <tbody>
+                            <tr class="border-b border-base-200">
+                                <td class="opacity-70">LDAP Library</td>
+                                <td class="text-right">
+                                    {% if ldap_available %}
+                                    <span class="badge badge-success text-white text-xs font-semibold">Installed</span>
+                                    {% else %}
+                                    <span class="badge badge-ghost text-xs font-semibold">Not installed</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="opacity-70">LDAP Status</td>
+                                <td class="text-right">
+                                    {% if ldap_config.get('enabled') %}
+                                    <span class="badge badge-success text-white text-xs font-semibold">Enabled</span>
+                                    {% else %}
+                                    <span class="badge badge-ghost text-xs font-semibold">Disabled</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
     
-    <div class="card-custom">
-        <div class="card-header flex justify-between items-center">
-            <h6 class="font-semibold text-gray-900 dark:text-white"><i class="bi bi-diagram-3 mr-2"></i>Active Directory (LDAP)</h6>
-            <button type="button" class="btn btn-outline btn-sm" onclick="testLdap()">
-                <i class="bi bi-magic mr-1"></i>Auto-Discover & Test
-            </button>
-        </div>
-        <div class="card-body">
-            <div id="ldapTestResult" class="alert hidden mb-4"></div>
+    <div class="card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card-body p-6">
+            <div class="flex justify-between items-center border-b border-base-200 pb-3 mb-4">
+                <h2 class="card-title text-base font-semibold"><i data-lucide="network" class="text-primary w-5 h-5 mr-2"></i>LDAP / Active Directory</h2>
+                <button type="button" class="btn btn-outline btn-sm" onclick="testLdap()">
+                    <i data-lucide="plug" class="w-4 h-4 mr-1"></i>Auto-Discover & Test
+                </button>
+            </div>
+            
+            <div id="ldapTestResult" class="alert hidden mb-4 shadow-sm"></div>
             
             <form action="{{ url_for('web_save_ldap') }}" method="POST" id="ldapForm">
                 <input type="hidden" name="ldap_base_dn" id="discoveredBaseDn" value="{{ ldap_config.get('base_dn', '') }}">
                 
-                <div class="mb-4">
-                    <label class="form-label">AD Server Address</label>
-                    <input type="text" class="form-control" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100" value="{{ ldap_config.get('server', '') }}" required>
-                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">IP address or domain of the Domain Controller</small>
+                <div class="form-control w-full mb-4">
+                    <label class="label"><span class="label-text font-semibold">AD Server Address</span></label>
+                    <input type="text" class="input input-bordered w-full" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100" value="{{ ldap_config.get('server', '') }}" required>
+                    <span class="label-text-alt opacity-50 mt-1 block">IP address or domain of the Domain Controller</span>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label">Service Account (Username)</label>
-                    <input type="text" class="form-control" name="ldap_bind_dn" id="ldapUser" placeholder="admin@domain.local" value="{{ ldap_config.get('bind_dn', '') }}" required>
-                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">UPN (user@domain.local) or traditional DOMAIN\\user</small>
+                <div class="form-control w-full mb-4">
+                    <label class="label"><span class="label-text font-semibold">Service Account (Username)</span></label>
+                    <input type="text" class="input input-bordered w-full" name="ldap_bind_dn" id="ldapUser" placeholder="admin@domain.local" value="{{ ldap_config.get('bind_dn', '') }}" required>
+                    <span class="label-text-alt opacity-50 mt-1 block">UPN (user@domain.local) or traditional DOMAIN\\user</span>
                 </div>
-                <div class="mb-4">
-                    <label class="form-label">Password</label>
-                    <input type="password" class="form-control" name="ldap_bind_password" id="ldapPass" placeholder="••••••••">
-                    <small class="text-gray-500 dark:text-gray-400 text-xs mt-1 block">Only needed if changing existing configuration</small>
+                <div class="form-control w-full mb-4">
+                    <label class="label"><span class="label-text font-semibold">Password</span></label>
+                    <input type="password" class="input input-bordered w-full" name="ldap_bind_password" id="ldapPass" placeholder="••••••••">
+                    <span class="label-text-alt opacity-50 mt-1 block">Only needed if changing existing configuration</span>
                 </div>
                 
                 {% if ldap_config.get('base_dn') %}
-                <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-                    <span class="text-gray-500 dark:text-gray-400 mr-2">Active Base DN:</span>
-                    <code class="text-xs text-blue-600 dark:text-blue-400">{{ ldap_config.get('base_dn') }}</code>
+                <div class="mb-4 p-3 bg-base-200 border border-base-300 rounded-lg text-sm flex items-center justify-between">
+                    <span class="opacity-60">Active Base DN:</span>
+                    <code class="text-xs font-semibold text-primary">{{ ldap_config.get('base_dn') }}</code>
                 </div>
                 {% endif %}
                 
-                <div class="form-check form-switch mb-4">
-                    <input type="checkbox" class="form-check-input" name="ldap_enabled" id="ldapEnabled" {{ 'checked' if ldap_config.get('enabled') else '' }}>
-                    <label class="form-check-label" for="ldapEnabled">Enable Active Directory Login</label>
+                <div class="form-control w-full mb-6">
+                    <label class="label cursor-pointer justify-start gap-3">
+                        <input type="checkbox" class="checkbox checkbox-primary" name="ldap_enabled" id="ldapEnabled" {{ 'checked' if ldap_config.get('enabled') else '' }}>
+                        <span class="label-text font-semibold">Enable LDAP Authentication</span>
+                    </label>
                 </div>
-                <button type="submit" class="btn btn-primary w-full">
-                    <i class="bi bi-save mr-1"></i>Save Configuration
+                <button type="submit" class="btn btn-primary w-full sm:w-auto text-white">
+                    <i data-lucide="save" class="w-4 h-4 mr-1"></i>Save Configuration
                 </button>
             </form>
         </div>
@@ -987,9 +1032,10 @@ function testLdap() {
     }
     
     const resultDiv = document.getElementById('ldapTestResult');
-    resultDiv.className = 'alert alert-info';
-    resultDiv.innerHTML = '<i class="bi bi-hourglass-split mr-2"></i>Testing connection and discovering Base DN...';
+    resultDiv.className = 'alert alert-info shadow-sm flex items-center gap-2';
+    resultDiv.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-600"></i>Testing connection and discovering Base DN...';
     resultDiv.classList.remove('hidden');
+    if (window.lucide) { lucide.createIcons(); }
     
     fetch('/api/ldap/test', { 
         method: 'POST',
@@ -999,22 +1045,24 @@ function testLdap() {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                resultDiv.className = 'alert alert-success';
-                resultDiv.innerHTML = '<i class="bi bi-check-circle mr-2"></i>' + data.message;
+                resultDiv.className = 'alert alert-success shadow-sm flex items-center gap-2';
+                resultDiv.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4 text-green-600"></i>' + data.message;
                 if (data.base_dn) {
                     document.getElementById('discoveredBaseDn').value = data.base_dn;
                 }
             } else {
-                resultDiv.className = 'alert alert-danger';
-                resultDiv.innerHTML = '<i class="bi bi-x-circle mr-2"></i>' + data.message;
+                resultDiv.className = 'alert alert-danger shadow-sm flex items-center gap-2';
+                resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600"></i>' + data.message;
                 if (!data.ldap_available) {
                     resultDiv.innerHTML += '<br><small>Install ldap3: <code>pip install ldap3</code></small>';
                 }
             }
+            if (window.lucide) { lucide.createIcons(); }
         })
         .catch(err => {
-            resultDiv.className = 'alert alert-danger';
-            resultDiv.innerHTML = '<i class="bi bi-x-circle mr-2"></i>Connection test failed: ' + err;
+            resultDiv.className = 'alert alert-danger shadow-sm flex items-center gap-2';
+            resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600"></i>Connection test failed: ' + err;
+            if (window.lucide) { lucide.createIcons(); }
         });
 }
 </script>
@@ -1117,14 +1165,37 @@ def web_logout():
     session.clear()
     return redirect(url_for('web_login'))
 
-def get_devices_list():
+def update_offline_devices(conn):
+    # This function is kept for compatibility on writes (e.g. heartbeat updates)
+    # but no longer called on read paths (GET requests) to prevent DB locks.
+    conn.execute("UPDATE devices SET online = 0 WHERE datetime(last_seen) < datetime('now', '-30 seconds') OR last_seen IS NULL")
+
+def get_devices_list(search_query=None):
     conn = get_db()
-    devices = conn.execute("SELECT * FROM devices ORDER BY last_seen DESC").fetchall()
+    # Offline status is now dynamically calculated below to prevent DB locking
+    if search_query:
+        q = f"%{search_query}%"
+        devices = conn.execute("SELECT * FROM devices WHERE hostname LIKE ? OR username LIKE ? OR os LIKE ? ORDER BY last_seen DESC", (q, q, q)).fetchall()
+    else:
+        devices = conn.execute("SELECT * FROM devices ORDER BY last_seen DESC").fetchall()
     conn.close()
     
     devices_list = []
     for d in devices:
         device = dict(d)
+        
+        # Calculate online status dynamically based on UTC timestamps
+        is_online = 0
+        last_seen = device.get('last_seen')
+        if last_seen:
+            try:
+                dt = datetime.fromisoformat(last_seen)
+                if datetime.utcnow() - dt < timedelta(seconds=30):
+                    is_online = 1
+            except Exception:
+                pass
+        device['online'] = is_online
+        
         # Short OS name
         os_full = device.get('os', '') or ''
         if 'Windows 11' in os_full:
@@ -1157,7 +1228,10 @@ def web_dashboard():
     
     # Stats
     total = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
-    online = conn.execute("SELECT COUNT(*) FROM devices WHERE online = 1").fetchone()[0]
+    # Calculate online count dynamically to avoid database writes
+    online = conn.execute(
+        "SELECT COUNT(*) FROM devices WHERE last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-30 seconds')"
+    ).fetchone()[0]
     connections_today = conn.execute("SELECT COUNT(*) FROM connections WHERE date(started_at) = date('now')").fetchone()[0]
     users_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     
@@ -1211,12 +1285,13 @@ def web_dashboard():
 @app.route('/devices')
 @web_login_required
 def web_devices():
-    devices_list = get_devices_list()
+    search_query = request.args.get('search', '')
+    devices_list = get_devices_list(search_query)
     return render_page(DEVICES_HTML,
         title='Devices',
         active_page='devices',
         devices=devices_list,
-        devices_json=json.dumps(devices_list)
+        search_query=search_query
     )
 
 @app.route('/users')
@@ -1460,7 +1535,7 @@ def api_heartbeat():
         conn.execute('''INSERT INTO devices (id, uuid, online, last_seen) VALUES (?, ?, 1, datetime('now'))
                         ON CONFLICT(id) DO UPDATE SET uuid = excluded.uuid, online = 1, last_seen = datetime('now')''',
                      (device_id, uuid))
-        conn.execute("UPDATE devices SET online = 0 WHERE datetime(last_seen) < datetime('now', '-60 seconds')")
+        update_offline_devices(conn)
         conn.commit()
         conn.close()
     
@@ -1526,11 +1601,31 @@ def api_admin_devices():
     if not request.current_user.get('is_admin'):
         return jsonify({"error": "Access denied"}), 403
     
+    search_query = request.args.get('search', '')
     conn = get_db()
-    devices = conn.execute("SELECT * FROM devices ORDER BY last_seen DESC").fetchall()
+    if search_query:
+        q = f"%{search_query}%"
+        devices = conn.execute("SELECT * FROM devices WHERE hostname LIKE ? OR username LIKE ? OR os LIKE ? ORDER BY last_seen DESC", (q, q, q)).fetchall()
+    else:
+        devices = conn.execute("SELECT * FROM devices ORDER BY last_seen DESC").fetchall()
     conn.close()
     
-    return jsonify({"devices": [dict(d) for d in devices]})
+    devices_list = []
+    for d in devices:
+        device = dict(d)
+        is_online = 0
+        last_seen = device.get('last_seen')
+        if last_seen:
+            try:
+                dt = datetime.fromisoformat(last_seen)
+                if datetime.utcnow() - dt < timedelta(seconds=30):
+                    is_online = 1
+            except Exception:
+                pass
+        device['online'] = is_online
+        devices_list.append(device)
+    
+    return jsonify({"devices": devices_list})
 
 @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
 @token_required
@@ -1569,13 +1664,23 @@ def api_peers():
     
     peers_list = []
     for d in devices:
+        is_online = 0
+        last_seen = d['last_seen']
+        if last_seen:
+            try:
+                dt = datetime.fromisoformat(last_seen)
+                if datetime.utcnow() - dt < timedelta(seconds=30):
+                    is_online = 1
+            except Exception:
+                pass
+        
         peer = {
             "id": d['id'],
             "user": str(d['user_id']),
             "user_name": d['username'] or '',
             "device_group_name": d['group_name'] or 'Default',
             "note": "",
-            "status": 1 if d['online'] else 0,
+            "status": is_online,
             "info": {
                 "os": d['os'] or '',
                 "username": d['username'] or '',
@@ -1597,7 +1702,7 @@ if __name__ == '__main__':
     ssl_context = None
     protocol = "http"
     ssl_status = "MANAGED BY REVERSE PROXY (Coolify)"
-
+    
     print(f"""
 ╔═══════════════════════════════════════════════════════════════════╗
 ║          RustDesk Web Management Panel v2.0 (Tailwind)            ║
