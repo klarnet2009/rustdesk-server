@@ -1142,9 +1142,6 @@ MY_DEVICES_HTML = r"""
 {% block content %}
 <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold text-base-content text-balance">My Devices</h1>
-    <button class="btn btn-primary text-white" onclick="document.getElementById('claimDeviceModal').showModal()">
-        <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>Claim Device
-    </button>
 </div>
 
 <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -1241,34 +1238,7 @@ MY_DEVICES_HTML = r"""
     </form>
 </dialog>
 
-<!-- Claim Device Modal -->
-<dialog id="claimDeviceModal" class="modal">
-    <div class="modal-box">
-        <form method="dialog">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close modal">✕</button>
-        </form>
-        <h3 class="font-bold text-lg text-balance mb-4">Claim Device</h3>
-        <form action="{{ url_for('web_claim_device') }}" method="POST">
-            <div class="form-control w-full mb-4">
-                <label class="label" for="claim-device-id"><span class="label-text font-semibold">RustDesk Device ID</span></label>
-                <input type="text" id="claim-device-id" class="input input-bordered w-full tabular-nums" name="device_id" placeholder="Device ID… e.g. 123456789" required autocomplete="off" spellcheck="false">
-                <span class="label-text-alt opacity-50 mt-1 block">The 9-digit RustDesk ID shown on the remote device.</span>
-            </div>
-            <div class="form-control w-full mb-6">
-                <label class="label" for="claim-device-password"><span class="label-text font-semibold">Connection Password (Optional)</span></label>
-                <input type="password" id="claim-device-password" class="input input-bordered w-full" name="password" placeholder="Password…" autocomplete="new-password" spellcheck="false">
-                <span class="label-text-alt opacity-50 mt-1 block">Set the permanent password for one-click connections.</span>
-            </div>
-            <div class="flex justify-end gap-3 mt-4">
-                <button type="button" class="btn btn-ghost" onclick="document.getElementById('claimDeviceModal').close()">Cancel</button>
-                <button type="submit" class="btn btn-primary text-white">Claim Device</button>
-            </div>
-        </form>
-    </div>
-    <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-    </form>
-</dialog>
+
 {% endblock %}
 
 {% block scripts %}
@@ -1767,40 +1737,117 @@ def api_current_user():
         "is_admin": bool(user['is_admin'])
     })
 
+def merge_address_book(user_id, ab_data_str):
+    import json
+    try:
+        ab = json.loads(ab_data_str) if ab_data_str else {"tags": [], "peers": []}
+    except Exception:
+        ab = {"tags": [], "peers": []}
+        
+    if "peers" not in ab:
+        ab["peers"] = []
+    if "tags" not in ab:
+        ab["tags"] = []
+        
+    conn = get_db()
+    devices = conn.execute("SELECT * FROM devices WHERE user_id = ?", (user_id,)).fetchall()
+    conn.close()
+    
+    for d in devices:
+        device_id = d['id']
+        is_online = 0
+        last_seen = d['last_seen']
+        if last_seen:
+            try:
+                dt = datetime.fromisoformat(last_seen)
+                if datetime.utcnow() - dt < timedelta(seconds=30):
+                    is_online = 1
+            except Exception:
+                pass
+                
+        peer_found = False
+        for p in ab['peers']:
+            if p.get('id') == device_id:
+                peer_found = True
+                p['password'] = d['password'] or p.get('password') or ''
+                p['username'] = d['username'] or p.get('username') or 'admin'
+                p['hostname'] = d['hostname'] or p.get('hostname') or device_id
+                p['online'] = bool(is_online)
+                break
+                
+        if not peer_found:
+            ab['peers'].append({
+                "id": device_id,
+                "username": d['username'] or 'admin',
+                "hostname": d['hostname'] or device_id,
+                "platform": (d['os'] or 'windows').lower().split(' ')[0],
+                "password": d['password'] or '',
+                "alias": d['hostname'] or device_id,
+                "tags": [],
+                "online": bool(is_online)
+            })
+            
+    return json.dumps(ab)
+
+def sync_passwords_from_ab(user_id, ab_data_str):
+    import json
+    try:
+        ab = json.loads(ab_data_str)
+        peers = ab.get('peers', [])
+    except Exception:
+        return
+        
+    if not peers:
+        return
+        
+    conn = get_db()
+    for p in peers:
+        peer_id = p.get('id')
+        password = p.get('password')
+        if peer_id and password:
+            conn.execute("UPDATE devices SET password = ? WHERE id = ? AND user_id = ?", (password, peer_id, user_id))
+    conn.commit()
+    conn.close()
+
 @app.route('/api/ab/get', methods=['GET', 'POST', 'OPTIONS'])
 @token_required
 def api_get_ab():
+    user_id = request.current_user['user_id']
     conn = get_db()
-    # HARDCODED `0` for Global Address Book across all users
-    ab = conn.execute("SELECT * FROM address_books WHERE user_id = ?", (0,)).fetchone()
+    ab = conn.execute("SELECT * FROM address_books WHERE user_id = ?", (user_id,)).fetchone()
     conn.close()
     
-    data = ab['data'] if ab else '{"tags":[],"peers":[]}'
-    return jsonify({"updated_at": int(time.time()), "data": data})
+    raw_data = ab['data'] if ab else '{"tags":[],"peers":[]}'
+    merged_data = merge_address_book(user_id, raw_data)
+    return jsonify({"updated_at": int(time.time()), "data": merged_data})
 
 @app.route('/api/ab', methods=['GET', 'POST', 'OPTIONS'])
 @token_required
 def api_ab():
     """Address Book - GET to retrieve, POST to update"""
+    user_id = request.current_user['user_id']
     conn = get_db()
     
     if request.method == 'GET':
-        # Get address book (Global `0`)
         ab = conn.execute("SELECT * FROM address_books WHERE user_id = ?", 
-                          (0,)).fetchone()
+                          (user_id,)).fetchone()
         conn.close()
-        data = ab['data'] if ab else '{"tags":[],"peers":[]}'
-        return jsonify({"updated_at": int(time.time()), "data": data})
+        raw_data = ab['data'] if ab else '{"tags":[],"peers":[]}'
+        merged_data = merge_address_book(user_id, raw_data)
+        return jsonify({"updated_at": int(time.time()), "data": merged_data})
     
     else:
-        # POST - Update address book (Global `0`)
         data = request.json or {}
         ab_data = data.get('data', '')
         
+        # Save address book for specific user
         conn.execute("INSERT OR REPLACE INTO address_books (user_id, data, updated_at) VALUES (?, ?, datetime('now'))",
-                     (0, ab_data))
+                     (user_id, ab_data))
         conn.commit()
         conn.close()
+        
+        # Sync passwords back to the devices table
+        sync_passwords_from_ab(user_id, ab_data)
         
         return jsonify({"success": True})
 
