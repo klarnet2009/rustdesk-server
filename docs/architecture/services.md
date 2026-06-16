@@ -24,6 +24,7 @@
   - Monitoring active and historic device registrations.
   - Auditing connection and file transfer logs.
   - Auto-discovering and configuring Active Directory/LDAP credentials.
+  - Centralizing and enforcing client configuration profiles (Global Settings) across all client devices.
 * **Dependencies**: Python 3, Flask, SQLite (`rustdesk.db`), and optionally `ldap3` for Active Directory integration.
 * **APIs Exposed**:
   - `/api/devices`: List/update devices.
@@ -32,7 +33,9 @@
   - `/api/login`: Form-based authentication endpoint that maps the connecting device ID to the user.
   - `/api/currentUser`: Returns user metadata and includes a verifier to satisfy the client check, plus auto-links device ID to the user account on check-in.
   - `/api/ab` & `/api/ab/get`: Address book sync endpoints that merge the user's logged-in devices and tag them with `same-account` to enable passwordless connection.
+  - `/api/global-settings`: Public API providing centralized client settings (General & Security) for configuration enforcement.
   - `/login`: Form-based authentication endpoint.
+  - `/settings/global`: Post route to configure and update global settings.
   - `/my-devices`: Personal device management endpoint for user account.
   - `/my-devices/save-password`: Connection password manager for unattended access.
   - `/my-devices/claim`: Claims ownership of a device.

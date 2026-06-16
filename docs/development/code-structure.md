@@ -9,14 +9,22 @@ D:/rustdesk_src/
   │   ├── libs/                    # Shared libraries
   │   ├── src/                     # Rust source code (hbbs/hbbr)
   │   └── web_panel/               # Server-side Web Management Panel
-  │       ├── src/
-  │       │   └── input.css        # Source Tailwind CSS & custom selectors
-  │       ├── static/
-  │       │   └── output.css       # Production Tailwind CSS compiled assets
-  │       ├── ldap_auth.py         # AD / LDAP authentication logic
-  │       ├── package.json         # Tailwind/DaisyUI devDependencies
-  │       ├── server.py            # Flask server, route controllers & HTML templates
-  │       └── tailwind.config.js   # Tailwind & DaisyUI configuration
+  └── rustdesk/                    # RustDesk client codebase
+      ├── src/                     # Rust source code
+      │   ├── common.rs            # Core client utilities and update check triggers
+      │   ├── updater.rs           # Windows background updater service
+      │   └── flutter_ffi.rs       # Rust-Flutter FFI bindings (update-me key handler, Windows SSPI SSO collector)
+      └── flutter/                 # Flutter UI application codebase
+          ├── lib/
+          │   ├── main.dart        # Client entry point (launches update check)
+          │   ├── common.dart      # Common client state, handles update events
+          │   ├── widgets/
+          │   │   └── update_dialog.dart # Mobile Update Dialog & Controller
+          │   └── desktop/
+          │       └── widgets/
+          │           └── update_progress.dart # Desktop Update progress widget
+          └── android/             # Android Kotlin source files
+              └── app/src/.../UpdateService.kt # Kotlin APK downloader and installer
 ```
 
 ## Major Entry Points

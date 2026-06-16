@@ -46,3 +46,27 @@ sequenceDiagram
    - If a user updates the connection password in the client app's address book, the client app posts the update via `POST /api/ab`.
    - The server intercepts the post, extracts the passwords, and automatically updates the `password` field in the `devices` table for the corresponding devices owned by the user.
    - If the user edits the password in the Web Panel, it updates the `devices` table, which is automatically included in the next `/api/ab/get` sync payload received by all of the user's clients.
+
+## 5. Forced Automatic Update Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as RustDesk Client (Flutter/Rust)
+    participant UI as Client UI Dialog / Page
+    participant Server as GitHub Releases / Update API
+    participant OS as Operating System Installer (MSI/EXE/APK)
+
+    Client->>Server: Query latest version on startup
+    Server-->>Client: Return version & download URL
+    alt New Version Available
+        Client->>UI: Show non-dismissible "Updating..." screen
+        Client->>Server: Download installer package (EXE/MSI/APK)
+        Server-->>Client: Download complete
+        alt Windows Desktop
+            Client->>OS: Launch installer elevated with UAC --update flag
+            Client->>Client: Terminate process to allow file overwrite
+        else Android Mobile
+            Client->>OS: Launch ACTION_VIEW Intent with package-archive MIME type
+        end
+    end
+```
