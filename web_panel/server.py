@@ -1696,7 +1696,10 @@ def api_login():
         return jsonify({"error": "User disabled"})
     
     if device_id:
-        conn.execute("UPDATE devices SET user_id = ? WHERE id = ?", (user['id'], device_id))
+        uuid = data.get('uuid', '')
+        conn.execute("INSERT OR IGNORE INTO devices (id, uuid, online) VALUES (?, ?, 0)", (device_id, uuid))
+        conn.execute("UPDATE devices SET user_id = ?, uuid = COALESCE(NULLIF(?, ''), uuid) WHERE id = ?", 
+                     (user['id'], uuid, device_id))
         conn.commit()
     
     conn.close()
@@ -1723,18 +1726,41 @@ def api_logout():
 @app.route('/api/currentUser', methods=['POST', 'OPTIONS'])
 @token_required
 def api_current_user():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    # Read device id and uuid from request JSON if available
+    data = {}
+    if request.is_json:
+        try:
+            data = request.json or {}
+        except Exception:
+            pass
+            
+    device_id = data.get('id', '')
+    uuid = data.get('uuid', '')
+    
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE id = ?", (request.current_user['user_id'],)).fetchone()
-    conn.close()
     
     if not user:
+        conn.close()
         return jsonify({"error": "User not found"})
+        
+    if device_id:
+        conn.execute("INSERT OR IGNORE INTO devices (id, uuid, online) VALUES (?, ?, 0)", (device_id, uuid))
+        conn.execute("UPDATE devices SET user_id = ?, uuid = COALESCE(NULLIF(?, ''), uuid) WHERE id = ?", 
+                     (user['id'], uuid, device_id))
+        conn.commit()
+        
+    conn.close()
     
     return jsonify({
         "name": user['username'],
         "email": user['email'],
         "status": user['status'],
-        "is_admin": bool(user['is_admin'])
+        "is_admin": bool(user['is_admin']),
+        "verifier": ""
     })
 
 def merge_address_book(user_id, ab_data_str):
@@ -1773,6 +1799,10 @@ def merge_address_book(user_id, ab_data_str):
                 p['username'] = d['username'] or p.get('username') or 'admin'
                 p['hostname'] = d['hostname'] or p.get('hostname') or device_id
                 p['online'] = bool(is_online)
+                if 'tags' not in p or not isinstance(p['tags'], list):
+                    p['tags'] = []
+                if 'same-account' not in p['tags']:
+                    p['tags'].append('same-account')
                 break
                 
         if not peer_found:
@@ -1783,7 +1813,7 @@ def merge_address_book(user_id, ab_data_str):
                 "platform": (d['os'] or 'windows').lower().split(' ')[0],
                 "password": d['password'] or '',
                 "alias": d['hostname'] or device_id,
-                "tags": [],
+                "tags": ['same-account'],
                 "online": bool(is_online)
             })
             

@@ -29,6 +29,9 @@
   - `/api/devices`: List/update devices.
   - `/api/admin/users`: CRUD operations on console users.
   - `/api/ldap/test`: Auto-discovery connection check endpoint.
+  - `/api/login`: Form-based authentication endpoint that maps the connecting device ID to the user.
+  - `/api/currentUser`: Returns user metadata and includes a verifier to satisfy the client check, plus auto-links device ID to the user account on check-in.
+  - `/api/ab` & `/api/ab/get`: Address book sync endpoints that merge the user's logged-in devices and tag them with `same-account` to enable passwordless connection.
   - `/login`: Form-based authentication endpoint.
   - `/my-devices`: Personal device management endpoint for user account.
   - `/my-devices/save-password`: Connection password manager for unattended access.
