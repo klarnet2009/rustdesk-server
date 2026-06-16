@@ -339,6 +339,99 @@ def test_ldap_connection(test_server=None, test_user=None, test_pass=None):
     except Exception as e:
         return False, str(e), None
 
+def sync_all_ldap_users():
+    """
+    Fetch all users from LDAP/Active Directory and sync them to the database
+    """
+    if not LDAP_AVAILABLE:
+        return False, "LDAP library not available"
+        
+    config = get_ldap_config()
+    if config.get('enabled') != '1':
+        return False, "LDAP is disabled"
+        
+    server_url = config.get('server', '')
+    base_dn = config.get('base_dn', '')
+    bind_dn = config.get('bind_dn', '')
+    bind_password = config.get('bind_password', '')
+    
+    if not server_url or not base_dn or not bind_dn or not bind_password:
+        return False, "LDAP server, base DN, or service account credentials not fully configured"
+        
+    try:
+        server = Server(server_url, get_info=ALL)
+        conn = Connection(server, user=bind_dn, password=bind_password, authentication=NTLM)
+        if not conn.bind():
+            conn = Connection(server, user=bind_dn, password=bind_password, authentication=SIMPLE)
+            if not conn.bind():
+                return False, "Bind failed with service account credentials"
+                
+        # Search all persons
+        search_filter = "(objectClass=person)"
+        attributes = ['sAMAccountName', 'uid', 'cn', 'mail', 'displayName', 'memberOf']
+        
+        conn.search(base_dn, search_filter, attributes=attributes)
+        
+        if not conn.entries:
+            conn.unbind()
+            return True, "No users found in LDAP/AD"
+            
+        # Get admin groups setting from database
+        db_conn = sqlite3.connect(DB_PATH)
+        db_conn.row_factory = sqlite3.Row
+        c = db_conn.cursor()
+        row = c.execute("SELECT value FROM settings WHERE key = 'ldap_admin_groups'").fetchone()
+        admin_groups = []
+        if row and row['value'].strip():
+            admin_groups = [g.strip() for g in row['value'].split(',') if g.strip()]
+        else:
+            admin_groups = [
+                'Domain Admins', 'Administrators', 'Enterprise Admins',
+                'Администраторы домена', 'Администраторы', 'Admins', 'IT Admins', 'RustDesk Admins'
+            ]
+        db_conn.close()
+        
+        count = 0
+        for entry in conn.entries:
+            # Extract user info
+            user = str(entry.sAMAccountName) if hasattr(entry, 'sAMAccountName') and entry.sAMAccountName else \
+                   str(entry.uid) if hasattr(entry, 'uid') and entry.uid else \
+                   str(entry.cn) if hasattr(entry, 'cn') and entry.cn else None
+                   
+            if not user:
+                continue
+                
+            email = str(entry.mail) if hasattr(entry, 'mail') and entry.mail else f"{user}@localhost"
+            display_name = str(entry.displayName) if hasattr(entry, 'displayName') and entry.displayName else \
+                           str(entry.cn) if hasattr(entry, 'cn') else user
+                           
+            # Extract groups
+            groups = []
+            if hasattr(entry, 'memberOf'):
+                for group_dn in entry.memberOf:
+                    cn_part = str(group_dn).split(',')[0]
+                    if cn_part.upper().startswith('CN='):
+                        groups.append(cn_part[3:])
+                        
+            is_admin = any(group in groups for group in admin_groups)
+            
+            ldap_user = {
+                'username': user,
+                'email': email,
+                'display_name': display_name,
+                'groups': groups
+            }
+            
+            sync_ldap_user_to_db(ldap_user, is_admin)
+            count += 1
+            
+        conn.unbind()
+        return True, f"Successfully synchronized {count} users from LDAP/Active Directory"
+        
+    except Exception as e:
+        print(f"[LDAP] Sync failed: {e}")
+        return False, str(e)
+
 # Test function
 if __name__ == '__main__':
     print("LDAP Module Test")
