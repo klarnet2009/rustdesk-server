@@ -124,6 +124,13 @@ def init_db():
     except sqlite3.IntegrityError:
         pass
     
+    # Check if 'password' column exists in devices
+    try:
+        c.execute("SELECT password FROM devices LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE devices ADD COLUMN password TEXT")
+        print("[DB] Added password column to devices table")
+    
     conn.commit()
     conn.close()
 
@@ -164,6 +171,16 @@ def web_login_required(f):
     def decorated(*args, **kwargs):
         if 'user_id' not in session:
             return redirect(url_for('web_login'))
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('web_login'))
+        if not session.get('is_admin'):
+            return redirect(url_for('web_my_devices'))
         return f(*args, **kwargs)
     return decorated
 
@@ -250,9 +267,16 @@ BASE_HTML = r'''
                         </a>
                     </li>
                     <li>
-                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'devices' else '' }}" href="{{ url_for('web_devices') }}">
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'my_devices' else '' }}" href="{{ url_for('web_my_devices') }}">
                             <i data-lucide="monitor" class="w-5 h-5" aria-hidden="true"></i>
-                            Devices
+                            My Devices
+                        </a>
+                    </li>
+                    {% if session.is_admin %}
+                    <li>
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'devices' else '' }}" href="{{ url_for('web_devices') }}">
+                            <i data-lucide="shield" class="w-5 h-5" aria-hidden="true"></i>
+                            All Devices
                         </a>
                     </li>
                     <li>
@@ -273,6 +297,7 @@ BASE_HTML = r'''
                             Settings
                         </a>
                     </li>
+                    {% endif %}
                 </ul>
                 <!-- Footer -->
                 <div class="mt-auto pt-4 border-t border-base-300">
@@ -1112,6 +1137,193 @@ if (form) {
 {% endblock %}
 '''
 
+MY_DEVICES_HTML = r"""
+{% extends "base" %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-base-content text-balance">My Devices</h1>
+    <button class="btn btn-primary text-white" onclick="document.getElementById('claimDeviceModal').showModal()">
+        <i data-lucide="plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>Claim Device
+    </button>
+</div>
+
+<div class="card bg-base-100 border border-base-300 shadow-sm">
+    <div class="card-body p-6">
+        <div class="overflow-x-auto">
+            <table id="myDevicesTable" class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Hostname</th>
+                        <th>Username</th>
+                        <th>OS</th>
+                        <th>IP Address</th>
+                        <th>Password</th>
+                        <th>Status</th>
+                        <th>Last Seen</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in devices %}
+                    <tr class="hover">
+                        <td><span class="font-mono font-semibold text-primary tabular-nums">{{ d.id }}</span></td>
+                        <td>{{ d.hostname or '-' }}</td>
+                        <td>{{ d.username or '-' }}</td>
+                        <td>{{ d.os_short }}</td>
+                        <td><span class="tabular-nums">{{ d.ip or '-' }}</span></td>
+                        <td>
+                            {% if d.password %}
+                            <span class="font-mono text-sm opacity-60">••••••••</span>
+                            {% else %}
+                            <span class="badge badge-warning text-xs font-semibold">Not Set</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if d.online %}
+                            <span class="badge badge-success gap-1 text-white text-xs font-semibold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                Online
+                            </span>
+                            {% else %}
+                            <span class="badge badge-ghost text-xs font-semibold">Offline</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
+                        <td class="flex gap-1">
+                            <button class="btn btn-primary btn-sm text-white" onclick="connectTo('{{ d.id }}', '{{ d.password }}')" title="Connect" aria-label="Connect to device {{ d.id }}">
+                                <i data-lucide="link" class="w-4 h-4 mr-1" aria-hidden="true"></i>Connect
+                            </button>
+                            <button class="btn btn-outline btn-sm btn-square" onclick="showEditPassword('{{ d.id }}', '{{ d.password }}')" title="Set Password" aria-label="Set password for device {{ d.id }}">
+                                <i data-lucide="key" class="w-4 h-4" aria-hidden="true"></i>
+                            </button>
+                            <form action="/my-devices/unclaim/{{ d.id }}" method="POST" onsubmit="return confirm('Remove device “{{ d.hostname or d.id }}” from your account?')" class="inline">
+                                <button type="submit" class="btn btn-ghost btn-sm btn-square text-red-600" title="Remove Device" aria-label="Unclaim device {{ d.id }}">
+                                    <i data-lucide="trash-2" class="w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Password Modal -->
+<dialog id="editPasswordModal" class="modal">
+    <div class="modal-box">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close modal">✕</button>
+        </form>
+        <h3 class="font-bold text-lg text-balance mb-4">Edit Connection Password</h3>
+        <form action="{{ url_for('web_save_device_password') }}" method="POST" id="editPasswordForm">
+            <input type="hidden" name="device_id" id="edit-device-id">
+            <div class="form-control w-full mb-6">
+                <label class="label" for="device-password-input"><span class="label-text font-semibold">Unattended Access Password</span></label>
+                <div class="relative">
+                    <input type="password" id="device-password-input" class="input input-bordered w-full pr-10" name="password" placeholder="Enter password…" autocomplete="new-password" spellcheck="false">
+                    <button type="button" class="absolute right-3 top-3 opacity-50 hover:opacity-100" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
+                        <i data-lucide="eye" id="togglePasswordIcon" class="w-5 h-5" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <span class="label-text-alt opacity-50 mt-2 block">Set the permanent password configured on the remote client.</span>
+            </div>
+            <div class="flex justify-end gap-3 mt-4">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('editPasswordModal').close()">Cancel</button>
+                <button type="submit" class="btn btn-primary text-white">Save Password</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+
+<!-- Claim Device Modal -->
+<dialog id="claimDeviceModal" class="modal">
+    <div class="modal-box">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close modal">✕</button>
+        </form>
+        <h3 class="font-bold text-lg text-balance mb-4">Claim Device</h3>
+        <form action="{{ url_for('web_claim_device') }}" method="POST">
+            <div class="form-control w-full mb-4">
+                <label class="label" for="claim-device-id"><span class="label-text font-semibold">RustDesk Device ID</span></label>
+                <input type="text" id="claim-device-id" class="input input-bordered w-full tabular-nums" name="device_id" placeholder="Device ID… e.g. 123456789" required autocomplete="off" spellcheck="false">
+                <span class="label-text-alt opacity-50 mt-1 block">The 9-digit RustDesk ID shown on the remote device.</span>
+            </div>
+            <div class="form-control w-full mb-6">
+                <label class="label" for="claim-device-password"><span class="label-text font-semibold">Connection Password (Optional)</span></label>
+                <input type="password" id="claim-device-password" class="input input-bordered w-full" name="password" placeholder="Password…" autocomplete="new-password" spellcheck="false">
+                <span class="label-text-alt opacity-50 mt-1 block">Set the permanent password for one-click connections.</span>
+            </div>
+            <div class="flex justify-end gap-3 mt-4">
+                <button type="button" class="btn btn-ghost" onclick="document.getElementById('claimDeviceModal').close()">Cancel</button>
+                <button type="submit" class="btn btn-primary text-white">Claim Device</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('#myDevicesTable').DataTable({
+        pageLength: 25,
+        language: {
+            search: "Search:",
+            lengthMenu: "Show _MENU_ devices"
+        }
+    });
+});
+
+function connectTo(id, password) {
+    let url = 'rustdesk://' + id;
+    let idServer = '{{ id_server }}';
+    if (idServer) {
+        url += '@' + idServer;
+    }
+    let params = [];
+    if (password) {
+        params.push('password=' + encodeURIComponent(password));
+    }
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
+    window.location.href = url;
+}
+
+function showEditPassword(id, password) {
+    document.getElementById('edit-device-id').value = id;
+    document.getElementById('device-password-input').value = password;
+    document.getElementById('editPasswordModal').showModal();
+}
+
+function togglePasswordVisibility() {
+    const input = document.getElementById('device-password-input');
+    const icon = document.getElementById('togglePasswordIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.setAttribute('data-lucide', 'eye-off');
+    } else {
+        input.type = 'password';
+        icon.setAttribute('data-lucide', 'eye');
+    }
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+}
+</script>
+{% endblock %}
+"""
+
+
 # ==================== WEB ROUTES ====================
 
 def render_page(template, **kwargs):
@@ -1213,14 +1425,19 @@ def update_offline_devices(conn):
     # but no longer called on read paths (GET requests) to prevent DB locks.
     conn.execute("UPDATE devices SET online = 0 WHERE datetime(last_seen) < datetime('now', '-30 seconds') OR last_seen IS NULL")
 
-def get_devices_list(search_query=None):
+def get_devices_list(search_query=None, user_id=None):
     conn = get_db()
-    # Offline status is now dynamically calculated below to prevent DB locking
     if search_query:
         q = f"%{search_query}%"
-        devices = conn.execute("SELECT * FROM devices WHERE hostname LIKE ? OR username LIKE ? OR os LIKE ? ORDER BY last_seen DESC", (q, q, q)).fetchall()
+        if user_id is not None:
+            devices = conn.execute("SELECT * FROM devices WHERE user_id = ? AND (hostname LIKE ? OR username LIKE ? OR os LIKE ?) ORDER BY last_seen DESC", (user_id, q, q, q)).fetchall()
+        else:
+            devices = conn.execute("SELECT * FROM devices WHERE hostname LIKE ? OR username LIKE ? OR os LIKE ? ORDER BY last_seen DESC", (q, q, q)).fetchall()
     else:
-        devices = conn.execute("SELECT * FROM devices ORDER BY last_seen DESC").fetchall()
+        if user_id is not None:
+            devices = conn.execute("SELECT * FROM devices WHERE user_id = ? ORDER BY last_seen DESC", (user_id,)).fetchall()
+        else:
+            devices = conn.execute("SELECT * FROM devices ORDER BY last_seen DESC").fetchall()
     conn.close()
     
     devices_list = []
@@ -1269,14 +1486,28 @@ def get_devices_list(search_query=None):
 def web_dashboard():
     conn = get_db()
     
+    is_admin = session.get('is_admin')
+    user_id = session.get('user_id')
+    
     # Stats
-    total = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
-    # Calculate online count dynamically to avoid database writes
-    online = conn.execute(
-        "SELECT COUNT(*) FROM devices WHERE last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-30 seconds')"
-    ).fetchone()[0]
-    connections_today = conn.execute("SELECT COUNT(*) FROM connections WHERE date(started_at) = date('now')").fetchone()[0]
-    users_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if is_admin:
+        total = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
+        online = conn.execute(
+            "SELECT COUNT(*) FROM devices WHERE last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-30 seconds')"
+        ).fetchone()[0]
+        connections_today = conn.execute("SELECT COUNT(*) FROM connections WHERE date(started_at) = date('now')").fetchone()[0]
+        users_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    else:
+        total = conn.execute("SELECT COUNT(*) FROM devices WHERE user_id = ?", (user_id,)).fetchone()[0]
+        online = conn.execute(
+            "SELECT COUNT(*) FROM devices WHERE user_id = ? AND last_seen IS NOT NULL AND datetime(last_seen) >= datetime('now', '-30 seconds')",
+            (user_id,)
+        ).fetchone()[0]
+        connections_today = conn.execute(
+            "SELECT COUNT(*) FROM connections WHERE device_id IN (SELECT id FROM devices WHERE user_id = ?) AND date(started_at) = date('now')",
+            (user_id,)
+        ).fetchone()[0]
+        users_count = total # For non-admins, show their total devices as secondary stat
     
     # Chart data - last 7 days
     chart_labels = []
@@ -1284,13 +1515,22 @@ def web_dashboard():
     for i in range(6, -1, -1):
         date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
         label = (datetime.now() - timedelta(days=i)).strftime('%d.%m')
-        count = conn.execute("SELECT COUNT(*) FROM connections WHERE date(started_at) = ?", (date,)).fetchone()[0]
+        if is_admin:
+            count = conn.execute("SELECT COUNT(*) FROM connections WHERE date(started_at) = ?", (date,)).fetchone()[0]
+        else:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM connections WHERE device_id IN (SELECT id FROM devices WHERE user_id = ?) AND date(started_at) = ?",
+                (user_id, date)
+            ).fetchone()[0]
         chart_labels.append(label)
         chart_data.append(count)
     
     # OS distribution
     os_stats = {}
-    devices = conn.execute("SELECT os FROM devices WHERE os IS NOT NULL AND os != ''").fetchall()
+    if is_admin:
+        devices = conn.execute("SELECT os FROM devices WHERE os IS NOT NULL AND os != ''").fetchall()
+    else:
+        devices = conn.execute("SELECT os FROM devices WHERE user_id = ? AND os IS NOT NULL AND os != ''", (user_id,)).fetchall()
     for d in devices:
         os_name = d['os'] or ''
         if 'Windows 11' in os_name:
@@ -1307,7 +1547,7 @@ def web_dashboard():
     
     conn.close()
     
-    devices_list = get_devices_list()
+    devices_list = get_devices_list(user_id=None if is_admin else user_id)
     
     return render_page(DASHBOARD_HTML,
         title='Dashboard',
@@ -1326,7 +1566,7 @@ def web_dashboard():
     )
 
 @app.route('/devices')
-@web_login_required
+@admin_required
 def web_devices():
     search_query = request.args.get('search', '')
     devices_list = get_devices_list(search_query)
@@ -1338,7 +1578,7 @@ def web_devices():
     )
 
 @app.route('/users')
-@web_login_required
+@admin_required
 def web_users():
     conn = get_db()
     users = conn.execute("SELECT * FROM users ORDER BY id").fetchall()
@@ -1351,7 +1591,7 @@ def web_users():
     )
 
 @app.route('/users/add', methods=['POST'])
-@web_login_required
+@admin_required
 def web_add_user():
     username = request.form.get('username')
     email = request.form.get('email', '')
@@ -1370,7 +1610,7 @@ def web_add_user():
     return redirect(url_for('web_users'))
 
 @app.route('/logs')
-@web_login_required
+@admin_required
 def web_logs():
     log_type = request.args.get('type', 'all')
     
@@ -1389,7 +1629,7 @@ def web_logs():
     )
 
 @app.route('/settings')
-@web_login_required
+@admin_required
 def web_settings():
     conn = get_db()
     settings = {}
@@ -1412,7 +1652,7 @@ def web_settings():
     )
 
 @app.route('/settings/ldap', methods=['POST'])
-@web_login_required
+@admin_required
 def web_save_ldap():
     conn = get_db()
     settings = {
@@ -1738,6 +1978,137 @@ def api_peers():
 
 # Initialize DB on module load (for Gunicorn)
 init_db()
+
+
+def get_id_server():
+    conn = get_db()
+    row = conn.execute("SELECT value FROM settings WHERE key = 'id_server'").fetchone()
+    conn.close()
+    if row and row['value']:
+        return row['value']
+    return "10.21.31.11"
+
+@app.route('/my-devices')
+@web_login_required
+def web_my_devices():
+    conn = get_db()
+    devices = conn.execute("SELECT * FROM devices WHERE user_id = ? ORDER BY last_seen DESC", (session['user_id'],)).fetchall()
+    conn.close()
+    
+    id_server = get_id_server()
+    
+    devices_list = []
+    for d in devices:
+        is_online = 0
+        last_seen = d['last_seen']
+        if last_seen:
+            try:
+                dt = datetime.fromisoformat(last_seen)
+                if datetime.utcnow() - dt < timedelta(seconds=30):
+                    is_online = 1
+            except Exception:
+                pass
+                
+        last_seen_str = '-'
+        if last_seen:
+            try:
+                dt = datetime.fromisoformat(last_seen)
+                local_dt = dt + timedelta(hours=3) # MSK offset
+                last_seen_str = local_dt.strftime('%d.%m.%Y %H:%M')
+            except:
+                last_seen_str = last_seen
+                
+        # Short OS name
+        os_full = d['os'] or ''
+        if 'Windows 11' in os_full:
+            os_short = 'Windows 11'
+        elif 'Windows 10' in os_full:
+            os_short = 'Windows 10'
+        elif 'Linux' in os_full:
+            os_short = 'Linux'
+        elif 'Mac' in os_full or 'Darwin' in os_full:
+            os_short = 'macOS'
+        else:
+            os_short = os_full[:20] if os_full else '-'
+                
+        devices_list.append({
+            'id': d['id'],
+            'hostname': d['hostname'],
+            'username': d['username'],
+            'os': d['os'],
+            'os_short': os_short,
+            'ip': d['ip'],
+            'version': d['version'],
+            'cpu': d['cpu'],
+            'memory': d['memory'],
+            'online': is_online,
+            'password': d['password'] or '',
+            'last_seen_str': last_seen_str
+        })
+        
+    return render_page(MY_DEVICES_HTML,
+        title='My Devices',
+        active_page='my_devices',
+        devices=devices_list,
+        id_server=id_server
+    )
+
+@app.route('/my-devices/save-password', methods=['POST'])
+@web_login_required
+def web_save_device_password():
+    device_id = request.form.get('device_id')
+    password = request.form.get('password', '')
+    
+    if not device_id:
+        return redirect(url_for('web_my_devices'))
+        
+    conn = get_db()
+    # Security check: verify ownership
+    device = conn.execute("SELECT * FROM devices WHERE id = ? AND user_id = ?", (device_id, session['user_id'])).fetchone()
+    if device:
+        conn.execute("UPDATE devices SET password = ? WHERE id = ?", (password, device_id))
+        conn.commit()
+        print(f"[MY DEVICES] Updated password for device: {device_id} (owned by user {session['username']})")
+    conn.close()
+    
+    return redirect(url_for('web_my_devices'))
+
+@app.route('/my-devices/claim', methods=['POST'])
+@web_login_required
+def web_claim_device():
+    device_id = request.form.get('device_id')
+    password = request.form.get('password', '')
+    
+    if not device_id:
+        return redirect(url_for('web_my_devices'))
+        
+    device_id = device_id.strip()
+    
+    conn = get_db()
+    device = conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone()
+    if device:
+        conn.execute("UPDATE devices SET user_id = ?, password = ? WHERE id = ?", (session['user_id'], password, device_id))
+        print(f"[MY DEVICES] Claimed existing device: {device_id} for user {session['username']}")
+    else:
+        conn.execute("INSERT INTO devices (id, user_id, password, hostname, os, online) VALUES (?, ?, ?, ?, ?, 0)",
+                     (device_id, session['user_id'], password, "Claimed Device", "Unknown", 0))
+        print(f"[MY DEVICES] Claimed stub device: {device_id} for user {session['username']}")
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('web_my_devices'))
+
+@app.route('/my-devices/unclaim/<device_id>', methods=['POST'])
+@web_login_required
+def web_unclaim_device(device_id):
+    conn = get_db()
+    device = conn.execute("SELECT * FROM devices WHERE id = ? AND user_id = ?", (device_id, session['user_id'])).fetchone()
+    if device:
+        conn.execute("UPDATE devices SET user_id = NULL, password = NULL WHERE id = ?", (device_id,))
+        conn.commit()
+        print(f"[MY DEVICES] Unclaimed device: {device_id} for user {session['username']}")
+    conn.close()
+    return redirect(url_for('web_my_devices'))
 
 if __name__ == '__main__':
     

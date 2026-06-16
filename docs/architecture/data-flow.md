@@ -29,3 +29,9 @@ sequenceDiagram
    - `server.py` queries `rustdesk.db` for all devices.
    - For each device, `server.py` checks if `last_seen` is under 30 seconds ago to flag it as "Online".
    - Devices table is populated and sorted by last seen date using jQuery DataTables.
+
+## 3. Passwordless Connection Flow
+1. **Request**: The user navigates to the "My Devices" section and clicks "Connect" next to their device.
+2. **Resolution**: The web application retrieves the registered unattended password and the configured ID Server IP address.
+3. **Protocol Launch**: The browser triggers the custom protocol link: `rustdesk://<id>@<server>?password=<encoded_password>`.
+4. **Connection**: The local RustDesk client opens, parses the URL parameters, sets the server IP, passes the password credential automatically, and establishes the remote control session without prompting the user.

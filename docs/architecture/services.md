@@ -30,6 +30,10 @@
   - `/api/admin/users`: CRUD operations on console users.
   - `/api/ldap/test`: Auto-discovery connection check endpoint.
   - `/login`: Form-based authentication endpoint.
+  - `/my-devices`: Personal device management endpoint for user account.
+  - `/my-devices/save-password`: Connection password manager for unattended access.
+  - `/my-devices/claim`: Claims ownership of a device.
+  - `/my-devices/unclaim/<device_id>`: Removes device-account association.
 * **Internal Logic Overview**:
   - Employs SQLite raw queries with parameterized statements.
   - Implements Vercel Web Interface Guidelines (accessible focus states, non-breaking spacing, tabular-nums for numeric columns, unsaved form warning guards).

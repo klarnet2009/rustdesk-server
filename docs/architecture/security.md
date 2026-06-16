@@ -4,6 +4,8 @@
 * **Console Users**: Password hashes are computed using the SHA-256 algorithm with random salt values. Clear-text passwords are never stored in the database.
 * **REST APIs**: Secured using JSON Web Tokens (JWT) signed with a securely generated `JWT_SECRET` key. Token expiration is configured to 30 days.
 * **Session Cookie**: Encrypted session state storage managed by Flask's `SECRET_KEY`.
+* **Role-Based Access Control (RBAC)**: Custom `@admin_required` decorator restricts access to sensitive pages (All Devices, Users, logs, settings) to admin accounts. Non-admins are restricted to the personalized Dashboard and My Devices.
+* **Unattended Access Passwords**: Connection passwords for personal devices are saved securely in `rustdesk.db` and passed securely in local protocol calls (over `rustdesk://` custom scheme) without exposing them to other users.
 
 ## 2. LDAP Security
 * Active Directory binds are performed securely.

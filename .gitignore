@@ -13,4 +13,7 @@ test.*
 web_panel/node_modules/
 **/__pycache__/
 *.pyc
+web_panel/*.db
+web_panel/*.db*
+
 

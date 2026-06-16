@@ -7,8 +7,13 @@
   - `get_db()`: Helper returning a thread-safe connection to the SQLite database.
   - `token_required(f)`: Decodes and validates JWT bearer tokens for API authorization.
   - `web_login_required(f)`: Session guard for UI pages.
+  - `admin_required(f)`: Decorator protecting administrative routes from regular users.
   - `render_page(template, **kwargs)`: Custom HTML compiler extracting blocks and rendering them inside `BASE_HTML`.
   - `web_save_ldap()` / `api_test_ldap()`: LDAP configuration managers.
+  - `web_my_devices()`: Renders the personalized "My Devices" panel.
+  - `web_save_device_password()`: Updates the unattended connection password for a device.
+  - `web_claim_device()` / `web_unclaim_device()`: Manages device-to-user mappings.
+  - `get_id_server()`: Resolves the active ID Server IP.
 * **Internal Logic**: Runs a production-ready WSGI app via Gunicorn or debug mode on Flask. Maps SQLite records to tabular data.
 
 ## 2. ldap_auth.py (AD / LDAP Authentication Integration)
