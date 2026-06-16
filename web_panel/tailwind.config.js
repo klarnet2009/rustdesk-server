@@ -43,6 +43,10 @@ module.exports = {
           "primary-content": "#ffffff",
           accent: "#0d6efd",
           "accent-content": "#ffffff",
+          "--rounded-box": "1rem",      // border radius rounded-box for cards and other large boxes
+          "--rounded-btn": "0.5rem",     // border radius rounded-btn for buttons
+          "--rounded-badge": "1.9rem",   // border radius rounded-badge for badges
+          "--rounded-tab": "0.5rem",     // border radius rounded-tab for tabs
         },
         business: {
           ...require("daisyui/src/theming/themes")["business"],
@@ -50,6 +54,10 @@ module.exports = {
           "primary-content": "#ffffff",
           accent: "#0d6efd",
           "accent-content": "#ffffff",
+          "--rounded-box": "1rem",
+          "--rounded-btn": "0.5rem",
+          "--rounded-badge": "1.9rem",
+          "--rounded-tab": "0.5rem",
         },
       },
     ],
