@@ -14,6 +14,8 @@ import json
 import time
 import threading
 import hashlib
+import hmac
+import secrets
 import os
 import sqlite3
 from datetime import datetime, timedelta
@@ -38,8 +40,43 @@ except ImportError:
     def test_ldap_connection(): return False, "LDAP module not found"
     def sync_all_ldap_users(): return False, "LDAP module not found"
 
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rustdesk.db')
+
+def _load_or_create_secret(env_var, settings_key):
+    """Resolve a persistent secret: env var > settings table > generate once.
+
+    Never falls back to a hardcoded value: a secret shipped in source code
+    lets anyone forge sessions/JWTs (release-blocker).
+    """
+    from_env = os.environ.get(env_var)
+    if from_env:
+        return from_env
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (settings_key,)).fetchone()
+        if row and row['value']:
+            conn.close()
+            return row['value']
+        generated = secrets.token_hex(32)
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (settings_key, generated))
+        conn.commit()
+        conn.close()
+        print(f"[SECURITY] Generated new {settings_key} and stored it in the settings table")
+        return generated
+    except sqlite3.OperationalError:
+        # settings table not created yet (first import before init_db) —
+        # fall back to a process-local random secret; it will be persisted
+        # on next call once the table exists.
+        return secrets.token_hex(32)
+
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'rustdesk-web-panel-secret-key-2024')
+app.secret_key = _load_or_create_secret('SECRET_KEY', 'flask_secret_key')
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=os.environ.get('COOKIE_SECURE', 'false').lower() == 'true',
+)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Enable CORS for API endpoints
@@ -48,8 +85,15 @@ CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPT
 # Configuration
 HOST = os.environ.get('API_HOST', '0.0.0.0')  # Listen on all interfaces
 PORT = int(os.environ.get('API_PORT', 21114))
-JWT_SECRET = 'rustdesk-api-jwt-secret'
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rustdesk.db')
+
+_JWT_SECRET_CACHE = None
+
+def get_jwt_secret():
+    """JWT signing secret, persisted per-installation (env JWT_SECRET overrides)."""
+    global _JWT_SECRET_CACHE
+    if _JWT_SECRET_CACHE is None:
+        _JWT_SECRET_CACHE = _load_or_create_secret('JWT_SECRET', 'jwt_secret')
+    return _JWT_SECRET_CACHE
 
 # SSL Configuration
 SSL_ENABLED = os.environ.get('SSL_ENABLED', 'false').lower() == 'true'
@@ -148,8 +192,63 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+PBKDF2_ITERATIONS = 200_000
+
+def hash_password(password, salt=None):
+    """pbkdf2-sha256 with per-password salt: 'pbkdf2$<salt_hex>$<hash_hex>'."""
+    if salt is None:
+        salt = secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac('sha256', password.encode(), bytes.fromhex(salt), PBKDF2_ITERATIONS)
+    return f'pbkdf2${salt}${dk.hex()}'
+
+def verify_password(password, stored):
+    """Verify against pbkdf2 hash; transparently accepts legacy unsalted sha256."""
+    if not stored:
+        return False
+    if stored.startswith('pbkdf2$'):
+        try:
+            _, salt, _ = stored.split('$')
+        except ValueError:
+            return False
+        return hmac.compare_digest(hash_password(password, salt), stored)
+    # Legacy: unsalted sha256 hex
+    return hmac.compare_digest(hashlib.sha256(password.encode()).hexdigest(), stored)
+
+def maybe_upgrade_password(conn, user, password):
+    """Re-hash legacy sha256-stored passwords to pbkdf2 on successful login."""
+    stored = user['password'] or ''
+    if stored and not stored.startswith('pbkdf2$'):
+        conn.execute("UPDATE users SET password = ? WHERE id = ?",
+                     (hash_password(password), user['id']))
+        conn.commit()
+        print(f"[SECURITY] Migrated password hash to pbkdf2 for user '{user['username']}'")
+
+def sanitize_field(value, max_len=128):
+    """Strip control chars and HTML/JS-breaking characters from client-supplied fields.
+
+    Fields like hostname arrive via unauthenticated /api/sysinfo and are later
+    rendered in the web panel — this is a stored-XSS vector without filtering.
+    """
+    if not isinstance(value, str):
+        return ''
+    cleaned = ''.join(ch for ch in value if ch.isprintable() and ch not in '<>"\'\\`&;')
+    return cleaned[:max_len].strip()
+
+def audit_device_event(conn, device_id, action, data):
+    conn.execute("INSERT INTO audit_logs (type, device_id, peer_id, action, data) VALUES (?, ?, ?, ?, ?)",
+                 ('device', device_id, '', action, json.dumps(data, ensure_ascii=False)))
+
+def assign_device_to_user(conn, device_id, uuid, user_id, username):
+    """Link device to user, auditing ownership changes (incl. reassignment)."""
+    existing = conn.execute("SELECT user_id FROM devices WHERE id = ?", (device_id,)).fetchone()
+    conn.execute("INSERT OR IGNORE INTO devices (id, uuid, online) VALUES (?, ?, 0)", (device_id, uuid))
+    conn.execute("UPDATE devices SET user_id = ?, uuid = COALESCE(NULLIF(?, ''), uuid) WHERE id = ?",
+                 (user_id, uuid, device_id))
+    if existing and existing['user_id'] and existing['user_id'] != user_id:
+        audit_device_event(conn, device_id, 'reassigned', {
+            'from_user_id': existing['user_id'], 'to_user_id': user_id, 'to_username': username})
+        print(f"[MY DEVICES] Device {device_id} reassigned from user {existing['user_id']} to {username}")
+    conn.commit()
 
 def get_ldap_admin_groups(conn):
     try:
@@ -207,7 +306,7 @@ def create_token(user_id, username, is_admin):
         'username': username,
         'is_admin': is_admin,
         'exp': time.time() + 86400 * 30
-    }, JWT_SECRET, algorithm="HS256")
+    }, get_jwt_secret(), algorithm="HS256")
 
 def token_required(f):
     @wraps(f)
@@ -216,7 +315,7 @@ def token_required(f):
         if not token:
             return jsonify({"error": "Token required"}), 401
         try:
-            data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            data = jwt.decode(token, get_jwt_secret(), algorithms=["HS256"])
             request.current_user = data
         except:
             return jsonify({"error": "Invalid token"}), 401
@@ -1387,6 +1486,15 @@ MY_DEVICES_HTML = r"""
     <h1 class="text-2xl font-bold text-base-content text-balance">My Devices</h1>
 </div>
 
+{% if not devices %}
+<div class="card bg-base-100 border border-base-300 shadow-sm">
+    <div class="card-body p-10 items-center text-center">
+        <i data-lucide="monitor-off" class="w-12 h-12 opacity-30 mb-3" aria-hidden="true"></i>
+        <h2 class="font-semibold text-lg">Пока нет устройств</h2>
+        <p class="opacity-60 max-w-md">Войдите в свой аккаунт в приложении RustDesk на нужном устройстве — оно автоматически появится здесь и в адресной книге всех ваших клиентов.</p>
+    </div>
+</div>
+{% else %}
 <div class="card bg-base-100 border border-base-300 shadow-sm">
     <div class="card-body p-6">
         <div class="overflow-x-auto">
@@ -1407,7 +1515,12 @@ MY_DEVICES_HTML = r"""
                 <tbody>
                     {% for d in devices %}
                     <tr class="hover">
-                        <td><span class="font-mono font-semibold text-primary tabular-nums">{{ d.id }}</span></td>
+                        <td>
+                            <span class="font-mono font-semibold text-primary tabular-nums">{{ d.id }}</span>
+                            <button type="button" class="btn btn-ghost btn-xs btn-square js-copy-id" data-id="{{ d.id }}" title="Copy ID" aria-label="Copy device ID {{ d.id }}">
+                                <i data-lucide="copy" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                            </button>
+                        </td>
                         <td>{{ d.hostname or '-' }}</td>
                         <td>{{ d.username or '-' }}</td>
                         <td>{{ d.os_short }}</td>
@@ -1429,15 +1542,15 @@ MY_DEVICES_HTML = r"""
                             <span class="badge badge-ghost text-xs font-semibold">Offline</span>
                             {% endif %}
                         </td>
-                        <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
+                        <td><span class="tabular-nums js-last-seen" data-ts="{{ d.last_seen_iso }}">-</span></td>
                         <td class="flex gap-1">
-                            <button class="btn btn-primary btn-sm text-white" onclick="connectTo('{{ d.id }}', '{{ d.password }}')" title="Connect" aria-label="Connect to device {{ d.id }}">
+                            <button type="button" class="btn btn-primary btn-sm text-white js-connect" data-id="{{ d.id }}" data-password="{{ d.password }}" title="Connect" aria-label="Connect to device {{ d.id }}">
                                 <i data-lucide="link" class="w-4 h-4 mr-1" aria-hidden="true"></i>Connect
                             </button>
-                            <button class="btn btn-outline btn-sm btn-square" onclick="showEditPassword('{{ d.id }}', '{{ d.password }}')" title="Set Password" aria-label="Set password for device {{ d.id }}">
+                            <button type="button" class="btn btn-outline btn-sm btn-square js-edit-password" data-id="{{ d.id }}" data-password="{{ d.password }}" title="Set Password" aria-label="Set password for device {{ d.id }}">
                                 <i data-lucide="key" class="w-4 h-4" aria-hidden="true"></i>
                             </button>
-                            <form action="/my-devices/unclaim/{{ d.id }}" method="POST" onsubmit="return confirm('Remove device “{{ d.hostname or d.id }}” from your account?')" class="inline">
+                            <form action="/my-devices/unclaim/{{ d.id }}" method="POST" class="inline js-unclaim" data-hostname="{{ d.hostname or d.id }}">
                                 <button type="submit" class="btn btn-ghost btn-sm btn-square text-red-600" title="Remove Device" aria-label="Unclaim device {{ d.id }}">
                                     <i data-lucide="trash-2" class="w-4 h-4" aria-hidden="true"></i>
                                 </button>
@@ -1450,6 +1563,7 @@ MY_DEVICES_HTML = r"""
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Edit Password Modal -->
 <dialog id="editPasswordModal" class="modal">
@@ -1463,10 +1577,15 @@ MY_DEVICES_HTML = r"""
             <div class="form-control w-full mb-6">
                 <label class="label" for="device-password-input"><span class="label-text font-semibold">Unattended Access Password</span></label>
                 <div class="relative">
-                    <input type="password" id="device-password-input" class="input input-bordered w-full pr-10" name="password" placeholder="Enter password…" autocomplete="new-password" spellcheck="false">
-                    <button type="button" class="absolute right-3 top-3 opacity-50 hover:opacity-100" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
-                        <i data-lucide="eye" id="togglePasswordIcon" class="w-5 h-5" aria-hidden="true"></i>
-                    </button>
+                    <input type="password" id="device-password-input" class="input input-bordered w-full pr-20" name="password" placeholder="Enter password…" autocomplete="new-password" spellcheck="false">
+                    <div class="absolute right-3 top-3 flex gap-1">
+                        <button type="button" class="opacity-50 hover:opacity-100" id="btn-generate-password" title="Generate password" aria-label="Generate random password">
+                            <i data-lucide="dices" class="w-5 h-5" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="opacity-50 hover:opacity-100" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
+                            <i data-lucide="eye" id="togglePasswordIcon" class="w-5 h-5" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
                 <span class="label-text-alt opacity-50 mt-2 block">Set the permanent password configured on the remote client.</span>
             </div>
@@ -1481,42 +1600,107 @@ MY_DEVICES_HTML = r"""
     </form>
 </dialog>
 
-
 {% endblock %}
 
 {% block scripts %}
 <script>
+// tojson is the XSS-safe way to inject a server value into a JS context.
+const ID_SERVER = {{ id_server | tojson }};
+
+// NOTE: device data travels via data-* attributes (HTML-escaped by Jinja) and is
+// read through dataset — never interpolated into inline JS strings. Inline
+// handler interpolation was a stored-XSS vector (hostname is writable via the
+// unauthenticated /api/sysinfo endpoint).
+
 $(document).ready(function() {
-    $('#myDevicesTable').DataTable({
-        pageLength: 25,
-        language: {
-            search: "Search:",
-            lengthMenu: "Show _MENU_ devices"
-        }
-    });
+    if ($.fn.DataTable && $('#myDevicesTable tbody tr').length) {
+        $('#myDevicesTable').DataTable({
+            pageLength: 25,
+            language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ devices"
+            }
+        });
+    }
+    renderLocalTimes();
 });
 
+function renderLocalTimes() {
+    document.querySelectorAll('.js-last-seen').forEach(function(el) {
+        const ts = el.dataset.ts;
+        if (!ts) { el.textContent = '-'; return; }
+        const date = new Date(ts);
+        if (isNaN(date)) { el.textContent = '-'; return; }
+        const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
+        if (diffMin < 1) { el.textContent = 'только что'; return; }
+        if (diffMin < 60) { el.textContent = diffMin + ' мин назад'; return; }
+        el.textContent = date.toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+    });
+}
+
 function connectTo(id, password) {
-    let url = 'rustdesk://' + id;
-    let idServer = '{{ id_server }}';
-    if (idServer) {
-        url += '@' + idServer;
+    let url = 'rustdesk://' + encodeURIComponent(id);
+    if (ID_SERVER) {
+        url += '@' + encodeURIComponent(ID_SERVER);
     }
-    let params = [];
     if (password) {
-        params.push('password=' + encodeURIComponent(password));
-    }
-    if (params.length > 0) {
-        url += '?' + params.join('&');
+        url += '?password=' + encodeURIComponent(password);
     }
     window.location.href = url;
 }
 
-function showEditPassword(id, password) {
-    document.getElementById('edit-device-id').value = id;
-    document.getElementById('device-password-input').value = password;
-    document.getElementById('editPasswordModal').showModal();
-}
+document.addEventListener('click', function(e) {
+    const connectBtn = e.target.closest('.js-connect');
+    if (connectBtn) {
+        connectTo(connectBtn.dataset.id, connectBtn.dataset.password || '');
+        return;
+    }
+    const editBtn = e.target.closest('.js-edit-password');
+    if (editBtn) {
+        document.getElementById('edit-device-id').value = editBtn.dataset.id;
+        document.getElementById('device-password-input').value = editBtn.dataset.password || '';
+        document.getElementById('editPasswordModal').showModal();
+        return;
+    }
+    const copyBtn = e.target.closest('.js-copy-id');
+    if (copyBtn) {
+        const id = copyBtn.dataset.id;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(id);
+        } else {
+            const tmp = document.createElement('textarea');
+            tmp.value = id;
+            document.body.appendChild(tmp);
+            tmp.select();
+            document.execCommand('copy');
+            tmp.remove();
+        }
+        copyBtn.classList.add('text-success');
+        setTimeout(function() { copyBtn.classList.remove('text-success'); }, 800);
+    }
+});
+
+document.addEventListener('submit', function(e) {
+    const form = e.target.closest('.js-unclaim');
+    if (form) {
+        if (!confirm('Remove device “' + (form.dataset.hostname || '') + '” from your account?')) {
+            e.preventDefault();
+        }
+    }
+});
+
+document.getElementById('btn-generate-password').addEventListener('click', function() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const array = new Uint32Array(10);
+    crypto.getRandomValues(array);
+    let pwd = '';
+    for (let i = 0; i < 10; i++) { pwd += chars[array[i] % chars.length]; }
+    const input = document.getElementById('device-password-input');
+    input.value = pwd;
+    input.type = 'text';
+    document.getElementById('togglePasswordIcon').setAttribute('data-lucide', 'eye-off');
+    if (window.lucide) { lucide.createIcons(); }
+});
 
 function togglePasswordVisibility() {
     const input = document.getElementById('device-password-input');
@@ -1597,7 +1781,8 @@ def web_login():
             
             if local_user:
                 print(f"[LOGIN] Found local user: {username}, checking password…")
-                if local_user['password'] == hash_password(password) and local_user['status'] == 1:
+                if verify_password(password, local_user['password']) and local_user['status'] == 1:
+                    maybe_upgrade_password(conn, local_user, password)
                     user = local_user
                     print(f"[LOGIN] Local auth SUCCESS for: {username}")
                 else:
@@ -2086,7 +2271,8 @@ def api_login():
     # Fallback to local authentication
     if not user:
         local_user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-        if local_user and local_user['password'] == hash_password(password):
+        if local_user and verify_password(password, local_user['password']):
+            maybe_upgrade_password(conn, local_user, password)
             user = local_user
             
     if not user:
@@ -2099,10 +2285,7 @@ def api_login():
     
     if device_id:
         uuid = data.get('uuid', '')
-        conn.execute("INSERT OR IGNORE INTO devices (id, uuid, online) VALUES (?, ?, 0)", (device_id, uuid))
-        conn.execute("UPDATE devices SET user_id = ?, uuid = COALESCE(NULLIF(?, ''), uuid) WHERE id = ?", 
-                     (user['id'], uuid, device_id))
-        conn.commit()
+        assign_device_to_user(conn, device_id, uuid, user['id'], user['username'])
     
     conn.close()
     
@@ -2150,10 +2333,7 @@ def api_current_user():
         return jsonify({"error": "User not found"})
         
     if device_id:
-        conn.execute("INSERT OR IGNORE INTO devices (id, uuid, online) VALUES (?, ?, 0)", (device_id, uuid))
-        conn.execute("UPDATE devices SET user_id = ?, uuid = COALESCE(NULLIF(?, ''), uuid) WHERE id = ?", 
-                     (user['id'], uuid, device_id))
-        conn.commit()
+        assign_device_to_user(conn, device_id, uuid, user['id'], user['username'])
         
     conn.close()
     
@@ -2162,7 +2342,6 @@ def api_current_user():
         "email": user['email'],
         "status": user['status'],
         "is_admin": bool(user['is_admin']),
-        "verifier": ""
     })
 
 def merge_address_book(user_id, ab_data_str):
@@ -2289,8 +2468,8 @@ def api_heartbeat():
         return '', 200
     
     data = request.json or {}
-    device_id = data.get('id', '')
-    uuid = data.get('uuid', '')
+    device_id = sanitize_field(data.get('id', ''), 64)
+    uuid = sanitize_field(data.get('uuid', ''), 64)
     
     if device_id:
         conn = get_db()
@@ -2314,7 +2493,7 @@ def api_sysinfo():
     if not device_id:
         return 'ID_NOT_FOUND', 200
     
-    client_ip = data.get('ip', '') or request.remote_addr
+    client_ip = sanitize_field(data.get('ip', ''), 45) or request.remote_addr
     
     conn = get_db()
     conn.execute('''INSERT INTO devices (id, uuid, hostname, os, username, version, cpu, memory, ip, online, last_seen)
@@ -2323,9 +2502,11 @@ def api_sysinfo():
                     uuid = excluded.uuid, hostname = excluded.hostname, os = excluded.os,
                     username = excluded.username, version = excluded.version, cpu = excluded.cpu,
                     memory = excluded.memory, ip = excluded.ip, online = 1, last_seen = datetime('now')''',
-                 (device_id, data.get('uuid', ''), data.get('hostname', ''), data.get('os', ''),
-                  data.get('username', ''), data.get('version', ''), data.get('cpu', ''),
-                  data.get('memory', ''), client_ip))
+                 (sanitize_field(device_id, 64), sanitize_field(data.get('uuid', ''), 64),
+                  sanitize_field(data.get('hostname', ''), 128), sanitize_field(data.get('os', ''), 64),
+                  sanitize_field(data.get('username', ''), 64), sanitize_field(data.get('version', ''), 32),
+                  sanitize_field(data.get('cpu', ''), 128), sanitize_field(data.get('memory', ''), 32),
+                  client_ip))
     conn.commit()
     conn.close()
     
@@ -2489,14 +2670,15 @@ def web_my_devices():
             except Exception:
                 pass
                 
-        last_seen_str = '-'
+        last_seen_iso = ''
         if last_seen:
             try:
                 dt = datetime.fromisoformat(last_seen)
-                local_dt = dt + timedelta(hours=3) # MSK offset
-                last_seen_str = local_dt.strftime('%d.%m.%Y %H:%M')
-            except:
-                last_seen_str = last_seen
+                # Stored as UTC ("datetime('now')"); mark it so the browser can
+                # convert to the viewer's local timezone.
+                last_seen_iso = dt.isoformat() + 'Z'
+            except Exception:
+                pass
                 
         # Short OS name
         os_full = d['os'] or ''
@@ -2523,7 +2705,7 @@ def web_my_devices():
             'memory': d['memory'],
             'online': is_online,
             'password': d['password'] or '',
-            'last_seen_str': last_seen_str
+            'last_seen_iso': last_seen_iso
         })
         
     return render_page(MY_DEVICES_HTML,
@@ -2553,30 +2735,9 @@ def web_save_device_password():
     
     return redirect(url_for('web_my_devices'))
 
-@app.route('/my-devices/claim', methods=['POST'])
-@web_login_required
-def web_claim_device():
-    device_id = request.form.get('device_id')
-    password = request.form.get('password', '')
-    
-    if not device_id:
-        return redirect(url_for('web_my_devices'))
-        
-    device_id = device_id.strip()
-    
-    conn = get_db()
-    device = conn.execute("SELECT * FROM devices WHERE id = ?", (device_id,)).fetchone()
-    if device:
-        conn.execute("UPDATE devices SET user_id = ?, password = ? WHERE id = ?", (session['user_id'], password, device_id))
-        print(f"[MY DEVICES] Claimed existing device: {device_id} for user {session['username']}")
-    else:
-        conn.execute("INSERT INTO devices (id, user_id, password, hostname, os, online) VALUES (?, ?, ?, ?, ?, 0)",
-                     (device_id, session['user_id'], password, "Claimed Device", "Unknown", 0))
-        print(f"[MY DEVICES] Claimed stub device: {device_id} for user {session['username']}")
-    conn.commit()
-    conn.close()
-    
-    return redirect(url_for('web_my_devices'))
+# NOTE: the manual /my-devices/claim route was removed: it allowed any logged-in
+# user to hijack ANY device by ID without proof of ownership. Devices are linked
+# automatically on client login (assign_device_to_user) — that is the only path.
 
 @app.route('/my-devices/unclaim/<device_id>', methods=['POST'])
 @web_login_required
@@ -2610,13 +2771,22 @@ if __name__ == '__main__':
     protocol = "http"
     ssl_status = "MANAGED BY REVERSE PROXY (Coolify)"
     
+    # Warn loudly if the default admin credentials are still active
+    try:
+        _conn = get_db()
+        _admin = _conn.execute("SELECT * FROM users WHERE username = 'admin'").fetchone()
+        _conn.close()
+        if _admin and verify_password('admin123', _admin['password']):
+            print("[SECURITY] WARNING: default admin/admin123 credentials are ACTIVE — change the admin password immediately!")
+    except Exception:
+        pass
+    
     print(f"""
 ╔═══════════════════════════════════════════════════════════════════╗
 ║          RustDesk Web Management Panel v2.0 (Tailwind)            ║
 ╠═══════════════════════════════════════════════════════════════════╣
 ║  Web Panel:  {protocol}://{HOST}:{PORT}                                ║
 ║  API:        {protocol}://{HOST}:{PORT}/api/                           ║
-║  Login:      admin / admin123                                     ║
 ║  SSL:        {ssl_status}                                  ║
 ╠═══════════════════════════════════════════════════════════════════╣
 ║  NOTE: Run 'npm run build' first to compile Tailwind CSS!         ║

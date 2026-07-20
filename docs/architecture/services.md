@@ -31,7 +31,7 @@
   - `/api/admin/users`: CRUD operations on console users.
   - `/api/ldap/test`: Auto-discovery connection check endpoint.
   - `/api/login`: Form-based authentication endpoint that maps the connecting device ID to the user.
-  - `/api/currentUser`: Returns user metadata and includes a verifier to satisfy the client check, plus auto-links device ID to the user account on check-in.
+  - `/api/currentUser`: Returns user metadata; the controlled side authorizes passwordless same-account logins by comparing the returned username (case-insensitively) with its own logged-in account. Auto-links device ID to the user account on check-in (with audit logging of ownership changes).
   - `/api/ab` & `/api/ab/get`: Address book sync endpoints that merge the user's logged-in devices and tag them with `same-account` to enable passwordless connection.
   - `/api/global-settings`: Public API providing centralized client settings (General & Security) for configuration enforcement.
   - `/login`: Form-based authentication endpoint.
