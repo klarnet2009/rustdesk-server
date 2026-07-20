@@ -729,7 +729,7 @@ DASHBOARD_HTML = r'''
                         </td>
                         <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
                         <td>
-                            <button class="btn btn-primary btn-sm text-white" onclick="connectTo('{{ d.id }}')" aria-label="Connect to device {{ d.id }}">
+                            <button class="btn btn-primary btn-sm text-white" onclick='connectTo({{ d.id | tojson }})' aria-label="Connect to device {{ d.id }}">
                                 <i data-lucide="link" class="w-4 h-4" aria-hidden="true"></i> Connect
                             </button>
                         </td>
@@ -850,10 +850,10 @@ DEVICES_HTML = r'''
                         </td>
                         <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
                         <td class="flex gap-1">
-                            <button class="btn btn-primary btn-sm btn-square text-white" onclick="connectTo('{{ d.id }}')" title="Connect" aria-label="Connect to device {{ d.id }}">
+                            <button class="btn btn-primary btn-sm btn-square text-white" onclick='connectTo({{ d.id | tojson }})' title="Connect" aria-label="Connect to device {{ d.id }}">
                                 <i data-lucide="link" class="w-4 h-4" aria-hidden="true"></i>
                             </button>
-                            <button class="btn btn-outline btn-sm btn-square" onclick="showDetails('{{ d.id }}')" title="Details" aria-label="View details for device {{ d.id }}">
+                            <button class="btn btn-outline btn-sm btn-square" onclick='showDetails({{ d.id | tojson }})' title="Details" aria-label="View details for device {{ d.id }}">
                                 <i data-lucide="info" class="w-4 h-4" aria-hidden="true"></i>
                             </button>
                         </td>
@@ -985,7 +985,7 @@ USERS_HTML = r'''
                         </td>
                         <td><span class="text-sm opacity-70 tabular-nums">{{ u.created_at }}</span></td>
                         <td>
-                            <button class="btn btn-sm btn-ghost text-red-600 {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick="deleteUser({{ u.id }}, '{{ u.username }}')" {{ 'disabled' if u.username == 'admin' else '' }} aria-label="Delete user {{ u.username }}">
+                            <button class="btn btn-sm btn-ghost text-red-600 {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick='deleteUser({{ u.id }}, {{ u.username | tojson }})' {{ 'disabled' if u.username == 'admin' else '' }} aria-label="Delete user {{ u.username }}">
                                 <i data-lucide="trash-2" class="w-5 h-5" aria-hidden="true"></i>
                             </button>
                         </td>
