@@ -15,9 +15,11 @@ import time
 import threading
 import hashlib
 import hmac
+import re
 import secrets
 import os
 import sqlite3
+import urllib.request
 from datetime import datetime, timedelta
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -903,6 +905,12 @@ function connectTo(id) {
 
 const devices = {{ devices | tojson }};
 
+// HTML-escape values before innerHTML interpolation: device fields (hostname
+// etc.) are client-supplied and old DB rows predate server-side sanitization.
+function esc(s) {
+    return String(s ?? '').replace(/[&<>"'`]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+}
+
 function showDetails(id) {
     const d = devices.find(x => x.id === id);
     if (!d) return;
@@ -910,22 +918,23 @@ function showDetails(id) {
         <div class="overflow-x-auto">
             <table class="table table-compact w-full text-sm">
                 <tbody>
-                    <tr class="border-b border-base-200"><th class="w-24 opacity-60">ID</th><td><code class="font-mono font-semibold text-primary tabular-nums">${d.id}</code></td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Hostname</th><td>${d.hostname || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Username</th><td>${d.username || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">OS</th><td>${d.os || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">IP</th><td><span class="tabular-nums">${d.ip || '-'}</span></td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">CPU</th><td>${d.cpu || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Memory</th><td>${d.memory || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Version</th><td><span class="tabular-nums">${d.version || '-'}</span></td></tr>
-                    <tr><th class="opacity-60">Last Seen</th><td><span class="tabular-nums">${d.last_seen_str}</span></td></tr>
+                    <tr class="border-b border-base-200"><th class="w-24 opacity-60">ID</th><td><code class="font-mono font-semibold text-primary tabular-nums">${esc(d.id)}</code></td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Hostname</th><td>${esc(d.hostname) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Username</th><td>${esc(d.username) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">OS</th><td>${esc(d.os) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">IP</th><td><span class="tabular-nums">${esc(d.ip) || '-'}</span></td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">CPU</th><td>${esc(d.cpu) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Memory</th><td>${esc(d.memory) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="opacity-60">Version</th><td><span class="tabular-nums">${esc(d.version) || '-'}</span></td></tr>
+                    <tr><th class="opacity-60">Last Seen</th><td><span class="tabular-nums">${esc(d.last_seen_str)}</span></td></tr>
                 </tbody>
             </table>
         </div>
-        <button class="btn btn-primary w-full mt-4 text-white" onclick="connectTo('${d.id}')" aria-label="Connect to device ${d.id}">
+        <button id="detailsConnectBtn" class="btn btn-primary w-full mt-4 text-white" aria-label="Connect to device">
             <i data-lucide="link" class="w-4 h-4 mr-2" aria-hidden="true"></i>Connect
         </button>
     `;
+    document.getElementById('detailsConnectBtn').addEventListener('click', () => connectTo(d.id));
     document.getElementById('detailsModal').showModal();
     if (window.lucide) {
         lucide.createIcons();
@@ -2114,6 +2123,60 @@ def api_global_settings():
     return jsonify({
         'options': options
     })
+
+# ==================== CLIENT VERSION CHECK (auto-update) ====================
+# The RustDesk client (hbb_common::version_check_request) POSTs here when the
+# 'api-server' option is set. Answer with the newest semver-tagged GitHub
+# release that actually ships the flutter installer for the client's arch;
+# the client then derives the download URL (…/tag/X.Y.Z -> …/download/X.Y.Z/…).
+
+GITHUB_RELEASES_REPO = os.environ.get('UPDATE_GITHUB_REPO', 'klarnet2009/rustdesk')
+_VERSION_CACHE_TTL = 300  # seconds; keeps us clear of GitHub's 60 req/h unauth limit
+_version_cache = {}       # arch -> (timestamp, url)
+
+def _parse_semver(tag):
+    m = re.fullmatch(r'v?(\d+)\.(\d+)\.(\d+)', tag or '')
+    return tuple(int(g) for g in m.groups()) if m else None
+
+def _latest_release_url_for_arch(arch):
+    now = time.time()
+    cached = _version_cache.get(arch)
+    if cached and now - cached[0] < _VERSION_CACHE_TTL:
+        return cached[1]
+    url = ''
+    try:
+        req = urllib.request.Request(
+            f'https://api.github.com/repos/{GITHUB_RELEASES_REPO}/releases',
+            headers={'User-Agent': 'rustdesk-web-panel', 'Accept': 'application/vnd.github+json'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            releases = json.loads(resp.read())
+        best = None
+        for rel in releases:
+            if rel.get('draft'):
+                continue
+            tag = rel.get('tag_name', '')
+            ver = _parse_semver(tag)
+            if not ver:
+                continue  # 'nightly'/'beta' tags are not version-comparable
+            names = {a.get('name', '') for a in rel.get('assets', [])}
+            if f'rustdesk-{tag}-{arch}.msi' not in names and f'rustdesk-{tag}-{arch}.exe' not in names:
+                continue  # release without a flutter installer for this arch
+            if best is None or ver > best[0]:
+                best = (ver, tag)
+        if best:
+            url = f'https://github.com/{GITHUB_RELEASES_REPO}/releases/tag/{best[1]}'
+    except Exception as e:
+        print(f"[VERSION] GitHub release check failed: {e}")
+    _version_cache[arch] = (now, url)
+    return url
+
+@app.route('/api/version/latest', methods=['POST'])
+def api_version_latest():
+    data = request.get_json(silent=True) or {}
+    arch = data.get('arch') or 'x86_64'
+    if arch == 'x86':
+        arch = 'x86_64'  # this fork does not publish 32-bit installers
+    return jsonify({'url': _latest_release_url_for_arch(arch)})
 
 @app.route('/api/ldap/test', methods=['POST'])
 @web_login_required
