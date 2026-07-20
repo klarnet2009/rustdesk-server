@@ -185,7 +185,14 @@ def init_db():
     except sqlite3.OperationalError:
         c.execute("ALTER TABLE devices ADD COLUMN password TEXT")
         print("[DB] Added password column to devices table")
-    
+
+    # Check if 'display_name' column exists in users (AD display name)
+    try:
+        c.execute("SELECT display_name FROM users LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''")
+        print("[DB] Added display_name column to users table")
+
     conn.commit()
     conn.close()
 
@@ -2359,12 +2366,47 @@ def api_login():
         "type": "access_token",
         "user": {
             "name": user['username'],
+            "display_name": user['display_name'] or '',
             "email": user['email'],
             "status": user['status'],
             "is_admin": bool(user['is_admin']),
             "info": {}
         }
     })
+
+@app.route('/api/resolve', methods=['GET', 'POST', 'OPTIONS'])
+@token_required
+def api_resolve():
+    """Resolve a PC hostname to its RustDesk ID (connect-by-name support)."""
+    if request.method == 'OPTIONS':
+        return '', 200
+    name = request.args.get('name', '')
+    if not name and request.is_json:
+        try:
+            name = (request.get_json(silent=True) or {}).get('name', '')
+        except Exception:
+            name = ''
+    name = name.strip()
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+
+    conn = get_db()
+    try:
+        # Exact hostname match (case-insensitive), most recently seen first
+        d = conn.execute(
+            "SELECT id, hostname FROM devices WHERE LOWER(hostname) = LOWER(?) ORDER BY last_seen DESC LIMIT 1",
+            (name,)).fetchone()
+        if not d:
+            # Prefix match (type-ahead style)
+            d = conn.execute(
+                "SELECT id, hostname FROM devices WHERE hostname LIKE ? ORDER BY last_seen DESC LIMIT 1",
+                (name + '%',)).fetchone()
+    finally:
+        conn.close()
+
+    if not d:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'id': d['id'], 'hostname': d['hostname']})
 
 @app.route('/api/logout', methods=['POST', 'OPTIONS'])
 @token_required
@@ -2402,6 +2444,7 @@ def api_current_user():
     
     return jsonify({
         "name": user['username'],
+        "display_name": user['display_name'] or '',
         "email": user['email'],
         "status": user['status'],
         "is_admin": bool(user['is_admin']),

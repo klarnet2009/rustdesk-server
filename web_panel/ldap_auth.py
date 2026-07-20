@@ -230,21 +230,22 @@ def sync_ldap_user_to_db(ldap_user, is_admin=False):
     
     username = ldap_user['username']
     email = ldap_user.get('email', '')
-    
+    display_name = ldap_user.get('display_name', '') or ''
+
     # Check if user exists
     existing = c.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-    
+
     if existing:
         # Update existing user - ALWAYS update is_admin based on current LDAP groups
-        c.execute("UPDATE users SET email = ?, is_admin = ? WHERE username = ?", 
-                  (email, 1 if is_admin else 0, username))
+        c.execute("UPDATE users SET email = ?, is_admin = ?, display_name = ? WHERE username = ?",
+                  (email, 1 if is_admin else 0, display_name, username))
         user_id = existing[0]
         print(f"[LDAP] Updated user '{username}', is_admin={is_admin}")
     else:
         # Create new user with random password (they'll use LDAP auth)
         random_password = hashlib.sha256(f"ldap_{username}_{email}".encode()).hexdigest()
-        c.execute("INSERT INTO users (username, password, email, is_admin, status) VALUES (?, ?, ?, ?, 1)",
-                  (username, random_password, email, 1 if is_admin else 0))
+        c.execute("INSERT INTO users (username, password, email, is_admin, status, display_name) VALUES (?, ?, ?, ?, 1, ?)",
+                  (username, random_password, email, 1 if is_admin else 0, display_name))
         user_id = c.lastrowid
         print(f"[LDAP] Created user '{username}', is_admin={is_admin}")
     
