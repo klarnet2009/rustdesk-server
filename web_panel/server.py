@@ -1144,15 +1144,15 @@ SETTINGS_HTML = r'''
                 <h2 class="card-title text-base font-semibold text-balance border-b border-base-200 pb-3 mb-4"><i data-lucide="server" class="text-primary w-5 h-5 mr-2" aria-hidden="true"></i>Server Configuration</h2>
                 <div class="form-control w-full mb-4">
                     <label class="label" for="settings-id-server"><span class="label-text opacity-70">ID Server</span></label>
-                    <input type="text" id="settings-id-server" class="input input-bordered w-full bg-base-200 tabular-nums" value="10.21.31.11" disabled>
+                    <input type="text" id="settings-id-server" class="input input-bordered w-full bg-base-200 tabular-nums" value="{{ id_server }}" disabled>
                 </div>
                 <div class="form-control w-full mb-4">
                     <label class="label" for="settings-relay-server"><span class="label-text opacity-70">Relay Server</span></label>
-                    <input type="text" id="settings-relay-server" class="input input-bordered w-full bg-base-200 tabular-nums" value="10.21.31.11" disabled>
+                    <input type="text" id="settings-relay-server" class="input input-bordered w-full bg-base-200 tabular-nums" value="{{ relay_server }}" disabled>
                 </div>
                 <div class="form-control w-full">
                     <label class="label" for="settings-api-server"><span class="label-text opacity-70">API Server</span></label>
-                    <input type="text" id="settings-api-server" class="input input-bordered w-full bg-base-200" value="http://{{ request.host }}" disabled>
+                    <input type="text" id="settings-api-server" class="input input-bordered w-full bg-base-200" value="https://{{ request.host }}" disabled>
                 </div>
             </div>
         </div>
@@ -2056,12 +2056,15 @@ def web_settings():
     except Exception:
         global_settings = {}
     
+    id_server = get_id_server()
     return render_page(SETTINGS_HTML,
         title='Settings',
         active_page='settings',
         ldap_config=ldap_config,
         ldap_available=LDAP_AVAILABLE,
-        global_settings=global_settings
+        global_settings=global_settings,
+        id_server=id_server,
+        relay_server=id_server
     )
 
 @app.route('/settings/ldap', methods=['POST'])
@@ -2748,12 +2751,20 @@ start_ldap_sync_scheduler()
 
 
 def get_id_server():
+    # ID/relay host clients should use = the host the panel is served on
+    # (Traefik forwards the real Host header). A stored setting overrides, unless
+    # it's the retired 10.21.31.11 address. Falls back to the known domain.
     conn = get_db()
     row = conn.execute("SELECT value FROM settings WHERE key = 'id_server'").fetchone()
     conn.close()
-    if row and row['value']:
-        return row['value']
-    return "10.21.31.11"
+    stored = row['value'] if row and row['value'] else ''
+    if stored and stored != '10.21.31.11':
+        return stored
+    try:
+        host = (request.host or '').split(':')[0]
+    except Exception:
+        host = ''
+    return host or 'rustdesk.iterum.lv'
 
 @app.route('/my-devices')
 @web_login_required
