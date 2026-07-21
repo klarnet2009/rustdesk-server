@@ -359,7 +359,7 @@ def serve_static(filename):
 
 BASE_HTML = r'''
 <!DOCTYPE html>
-<html lang="ru" data-theme="corporate">
+<html lang="en" data-theme="corporate">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -536,7 +536,7 @@ BASE_HTML = r'''
 
 LOGIN_HTML = r'''
 <!DOCTYPE html>
-<html lang="ru" data-theme="corporate">
+<html lang="en" data-theme="corporate">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1506,8 +1506,8 @@ MY_DEVICES_HTML = r"""
 <div class="card bg-base-100 border border-base-300 shadow-sm">
     <div class="card-body p-10 items-center text-center">
         <i data-lucide="monitor-off" class="w-12 h-12 opacity-30 mb-3" aria-hidden="true"></i>
-        <h2 class="font-semibold text-lg">Пока нет устройств</h2>
-        <p class="opacity-60 max-w-md">Войдите в свой аккаунт в приложении RustDesk на нужном устройстве — оно автоматически появится здесь и в адресной книге всех ваших клиентов.</p>
+        <h2 class="font-semibold text-lg">No devices yet</h2>
+        <p class="opacity-60 max-w-md">Sign in to your account in the RustDesk app on a device — it will appear here and in the address book of all your clients automatically.</p>
     </div>
 </div>
 {% else %}
@@ -1648,9 +1648,9 @@ function renderLocalTimes() {
         const date = new Date(ts);
         if (isNaN(date)) { el.textContent = '-'; return; }
         const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
-        if (diffMin < 1) { el.textContent = 'только что'; return; }
-        if (diffMin < 60) { el.textContent = diffMin + ' мин назад'; return; }
-        el.textContent = date.toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+        if (diffMin < 1) { el.textContent = 'just now'; return; }
+        if (diffMin < 60) { el.textContent = diffMin + ' min ago'; return; }
+        el.textContent = date.toLocaleString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
     });
 }
 
