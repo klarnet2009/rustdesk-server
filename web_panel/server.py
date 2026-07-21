@@ -2898,4 +2898,9 @@ if __name__ == '__main__':
 ║  NOTE: Run 'npm run build' first to compile Tailwind CSS!         ║
 ╚═══════════════════════════════════════════════════════════════════╝
     """)
-    app.run(host=HOST, port=PORT, debug=True, threaded=True, ssl_context=ssl_context)
+    # debug=True enables Werkzeug's auto-reloader, which restarts the server
+    # whenever the app writes files (SQLite DB, logs, LDAP sync) — killing
+    # in-flight requests and producing intermittent 502s behind the reverse
+    # proxy right after login. Run without debug/reloader; keep threaded=True
+    # so concurrent dashboard/API requests are served.
+    app.run(host=HOST, port=PORT, debug=False, threaded=True, use_reloader=False, ssl_context=ssl_context)
