@@ -543,19 +543,55 @@ BASE_HTML = r'''
             return $(selector).DataTable(opts);
         };
 
+        // Chart.js instances register here so the theme toggle can re-color
+        // them in place (P6) instead of doing a full-page location.reload().
+        window.__charts = window.__charts || [];
+
+        // Resolve the DaisyUI semantic tokens the charts use into concrete
+        // oklch() color strings for the *current* theme. DaisyUI stores each
+        // token as raw oklch components (e.g. --p: 69.79% 0.19 44.9), so we
+        // wrap them in oklch(); alpha via the " / a" syntax. Re-reading these
+        // after data-theme changes yields the new theme's palette.
+        window.getChartThemeColors = function() {
+            const cs = getComputedStyle(document.documentElement);
+            const tok = function(name, alpha) {
+                const raw = cs.getPropertyValue(name).trim();
+                if (!raw) { return null; }
+                return alpha != null ? 'oklch(' + raw + ' / ' + alpha + ')' : 'oklch(' + raw + ')';
+            };
+            return {
+                primary: tok('--p'),
+                primaryFill: tok('--p', 0.12),
+                text: tok('--bc', 0.7),   // muted-text token: base-content/70
+                grid: tok('--b3'),        // grid lines match the base-300 borders
+                // Categorical palette for pie/doughnut segments (semantic
+                // tokens so they re-theme automatically): primary, info,
+                // success, warning, error.
+                palette: [tok('--p'), tok('--in'), tok('--su'), tok('--wa'), tok('--er')]
+            };
+        };
+
         // Theme toggle
         function toggleTheme() {
             const html = document.documentElement;
             const currentTheme = html.getAttribute('data-theme');
             const newTheme = currentTheme === 'business' ? 'corporate' : 'business';
-            
+
             html.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             updateThemeIcon();
-            
-            // Reload for charts if they exist
-            if (document.getElementById('connectionsChart') || document.getElementById('osChart')) {
-                location.reload();
+
+            // Re-theme charts IN PLACE — recolor each registered Chart.js
+            // instance from the new theme's tokens (no reload / flash / scroll
+            // loss). update('none') snaps colors without a transition tween.
+            if (window.__charts && window.__charts.length) {
+                const colors = window.getChartThemeColors();
+                window.__charts.forEach(function(ch) {
+                    if (ch && typeof ch.__recolor === 'function') {
+                        ch.__recolor(colors);
+                        ch.update('none');
+                    }
+                });
             }
         }
 
@@ -832,24 +868,23 @@ function connectTo(id) {
     window.location.href = 'rustdesk://connection/new/' + id;
 }
 
-// Get theme colors
-const htmlAttr = document.documentElement.getAttribute('data-theme');
-const isDark = htmlAttr === 'business';
-const gridColor = isDark ? '#374151' : '#e5e7eb';
-const textColor = isDark ? '#9ca3af' : '#6b7280';
-const primaryColor = '#fd6a02';
+// Build the dashboard charts and register them so the theme toggle can
+// re-color them in place (P6). getChartThemeColors() resolves DaisyUI tokens
+// for the current theme; each chart carries a __recolor(colors) method that
+// re-applies them, invoked by toggleTheme() after a switch.
+const chartColors = window.getChartThemeColors();
 
 // Connections Chart
 const connCtx = document.getElementById('connectionsChart').getContext('2d');
-new Chart(connCtx, {
+const connectionsChart = new Chart(connCtx, {
     type: 'line',
     data: {
         labels: {{ chart_labels | safe }},
         datasets: [{
             label: 'Connections',
             data: {{ chart_data | safe }},
-            borderColor: primaryColor,
-            backgroundColor: 'rgba(253, 106, 2, 0.1)',
+            borderColor: chartColors.primary,
+            backgroundColor: chartColors.primaryFill,
             fill: true,
             tension: 0.4
         }]
@@ -859,29 +894,44 @@ new Chart(connCtx, {
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-            y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
-            x: { grid: { color: gridColor }, ticks: { color: textColor } }
+            y: { beginAtZero: true, grid: { color: chartColors.grid }, ticks: { color: chartColors.text } },
+            x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text } }
         }
     }
 });
+connectionsChart.__recolor = function(colors) {
+    this.data.datasets[0].borderColor = colors.primary;
+    this.data.datasets[0].backgroundColor = colors.primaryFill;
+    this.options.scales.y.grid.color = colors.grid;
+    this.options.scales.y.ticks.color = colors.text;
+    this.options.scales.x.grid.color = colors.grid;
+    this.options.scales.x.ticks.color = colors.text;
+};
 
 // OS Chart
 const osCtx = document.getElementById('osChart').getContext('2d');
-new Chart(osCtx, {
+const osChart = new Chart(osCtx, {
     type: 'doughnut',
     data: {
         labels: {{ os_labels | safe }},
         datasets: [{
             data: {{ os_data | safe }},
-            backgroundColor: ['#fd6a02', '#0d6efd', '#10b981', '#f59e0b', '#ef4444']
+            backgroundColor: chartColors.palette
         }]
     },
     options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { color: textColor } } }
+        plugins: { legend: { position: 'bottom', labels: { color: chartColors.text } } }
     }
 });
+osChart.__recolor = function(colors) {
+    this.data.datasets[0].backgroundColor = colors.palette;
+    this.options.plugins.legend.labels.color = colors.text;
+};
+
+// Register both charts for in-place theme re-coloring.
+window.__charts.push(connectionsChart, osChart);
 </script>
 {% endblock %}
 '''
