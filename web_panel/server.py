@@ -771,6 +771,7 @@ DASHBOARD_HTML = r'''
             <h2 class="card-title text-base font-semibold text-balance">Recent Devices</h2>
             <a href="{{ url_for('web_devices') }}" class="btn btn-outline btn-sm">View All</a>
         </div>
+        {% if devices %}
         <div class="overflow-x-auto">
             <table class="table table-zebra w-full">
                 <thead>
@@ -814,6 +815,13 @@ DASHBOARD_HTML = r'''
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="py-16 text-center">
+            <i data-lucide="monitor-off" class="w-12 h-12 opacity-40 mx-auto mb-3" aria-hidden="true"></i>
+            <h2 class="font-semibold text-lg">No devices yet</h2>
+            <p class="text-sm text-base-content/70 mt-1 max-w-md mx-auto">Devices that sign in to this server will appear here automatically.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -890,6 +898,7 @@ DEVICES_HTML = r'''
 
 <div class="card bg-base-100 border border-base-300 shadow-sm">
     <div class="card-body p-6">
+        {% if devices %}
         <div class="overflow-x-auto">
             <table id="devicesTable" class="table table-zebra w-full">
                 <thead>
@@ -938,6 +947,13 @@ DEVICES_HTML = r'''
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="py-16 text-center">
+            <i data-lucide="monitor-off" class="w-12 h-12 opacity-40 mx-auto mb-3" aria-hidden="true"></i>
+            <h2 class="font-semibold text-lg">No devices found</h2>
+            <p class="text-sm text-base-content/70 mt-1 max-w-md mx-auto">Devices appear here once they connect to this server. If you're searching, try a different term.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -960,6 +976,7 @@ DEVICES_HTML = r'''
 {% block scripts %}
 <script>
 $(document).ready(function() {
+    if ($.fn.DataTable && $('#devicesTable tbody tr').length) {
     window.initDataTable('#devicesTable', {
         order: [[7, 'desc']],
         pageLength: 25,
@@ -971,6 +988,7 @@ $(document).ready(function() {
             lengthMenu: "Show _MENU_ devices"
         }
     });
+    }
 });
 
 function connectTo(id) {
@@ -1030,6 +1048,7 @@ USERS_HTML = r'''
 
 <div class="card bg-base-100 border border-base-300 shadow-sm">
     <div class="card-body p-6">
+        {% if users %}
         <div class="overflow-x-auto">
             <table id="usersTable" class="table table-zebra w-full">
                 <thead>
@@ -1077,6 +1096,13 @@ USERS_HTML = r'''
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="py-16 text-center">
+            <i data-lucide="users" class="w-12 h-12 opacity-40 mx-auto mb-3" aria-hidden="true"></i>
+            <h2 class="font-semibold text-lg">No users yet</h2>
+            <p class="text-sm text-base-content/70 mt-1 max-w-md mx-auto">Use the "Add User" button above to create the first account.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -1121,7 +1147,9 @@ USERS_HTML = r'''
 {% block scripts %}
 <script>
 $(document).ready(function() {
-    window.initDataTable('#usersTable', {});
+    if ($.fn.DataTable && $('#usersTable tbody tr').length) {
+        window.initDataTable('#usersTable', {});
+    }
 });
 
 function deleteUser(id, username) {
@@ -1149,6 +1177,7 @@ LOGS_HTML = r'''
 
 <div class="card bg-base-100 border border-base-300 shadow-sm">
     <div class="card-body p-6">
+        {% if logs %}
         <div class="overflow-x-auto">
             <table id="logsTable" class="table table-zebra w-full">
                 <thead>
@@ -1183,6 +1212,13 @@ LOGS_HTML = r'''
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div class="py-16 text-center">
+            <i data-lucide="scroll-text" class="w-12 h-12 opacity-40 mx-auto mb-3" aria-hidden="true"></i>
+            <h2 class="font-semibold text-lg">No logs yet</h2>
+            <p class="text-sm text-base-content/70 mt-1 max-w-md mx-auto">Audit events such as connections, file transfers, and alarms will appear here as devices are used.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -1190,10 +1226,12 @@ LOGS_HTML = r'''
 {% block scripts %}
 <script>
 $(document).ready(function() {
-    window.initDataTable('#logsTable', {
-        order: [[0, 'desc']],
-        pageLength: 50
-    });
+    if ($.fn.DataTable && $('#logsTable tbody tr').length) {
+        window.initDataTable('#logsTable', {
+            order: [[0, 'desc']],
+            pageLength: 50
+        });
+    }
 });
 </script>
 {% endblock %}
