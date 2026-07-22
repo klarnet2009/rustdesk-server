@@ -2225,93 +2225,12 @@ def api_login_sso():
         response.headers['WWW-Authenticate'] = 'Negotiate'
         return response
         
-    token_b64 = auth_header.split(' ')[1]
-    try:
-        import base64
-        token_bytes = base64.b64decode(token_b64)
-        
-        try:
-            import spnego
-            host = request.host.split(':')[0]
-            context = spnego.server(hostname=host, service="HTTP")
-            server_token = context.step(token_bytes)
-            
-            if context.complete:
-                client_principal = context.client_principal
-                username = client_principal.split('@')[0] if '@' in client_principal else client_principal
-                
-                is_admin = False
-                conn = get_db()
-                user_row = conn.execute("SELECT id, is_admin FROM users WHERE username = ?", (username,)).fetchone()
-                if user_row:
-                    user_id = user_row['id']
-                    is_admin = user_row['is_admin'] == 1
-                else:
-                    cursor = conn.cursor()
-                    cursor.execute("INSERT INTO users (username, password, email, is_admin) VALUES (?, ?, ?, ?)",
-                                   (username, '', f"{username}@domain.local", 0))
-                    user_id = cursor.lastrowid
-                    conn.commit()
-                conn.close()
-                
-                access_token = create_token(user_id, username, is_admin)
-                return jsonify({
-                    'access_token': access_token,
-                    'type': 'access_token',
-                    'user': {
-                        'name': username,
-                        'email': f"{username}@domain.local",
-                        'is_admin': is_admin,
-                        'status': 'active'
-                    }
-                })
-            else:
-                response = make_response(jsonify({'error': 'Negotiate handshake in progress'}), 401)
-                if server_token:
-                    response.headers['WWW-Authenticate'] = f"Negotiate {base64.b64encode(server_token).decode('utf-8')}"
-                else:
-                    response.headers['WWW-Authenticate'] = 'Negotiate'
-                return response
-                
-        except ImportError:
-            try:
-                token_str = token_bytes.decode('utf-8', errors='ignore')
-            except Exception:
-                token_str = ""
-            if token_str.startswith("TOCKEN_SIMULATION_"):
-                username = token_str.replace("TOCKEN_SIMULATION_", "")
-                is_admin = (username == "admin" or "admin" in username)
-                
-                conn = get_db()
-                user_row = conn.execute("SELECT id, is_admin FROM users WHERE username = ?", (username,)).fetchone()
-                if user_row:
-                    user_id = user_row['id']
-                    is_admin = user_row['is_admin'] == 1
-                else:
-                    cursor = conn.cursor()
-                    cursor.execute("INSERT INTO users (username, password, email, is_admin) VALUES (?, ?, ?, ?)",
-                                   (username, '', f"{username}@domain.local", 0))
-                    user_id = cursor.lastrowid
-                    conn.commit()
-                conn.close()
-                
-                access_token = create_token(user_id, username, is_admin)
-                return jsonify({
-                    'access_token': access_token,
-                    'type': 'access_token',
-                    'user': {
-                        'name': username,
-                        'email': f"{username}@domain.local",
-                        'is_admin': is_admin,
-                        'status': 'active'
-                    }
-                })
-            else:
-                return jsonify({'error': 'Kerberos validation library pyspnego not installed and simulation token not provided'}), 500
-                
-    except Exception as e:
-        print(f"[SSO ERROR] Kerberos validation failed: {e}")
-        return jsonify({'error': f'Kerberos SSO failed: {str(e)}'}), 401
+    token_b64 = auth_header.split(' ', 1)[1]
+    from sso_kerberos import SPNEGO_AVAILABLE
+    if not SPNEGO_AVAILABLE:
+        return jsonify({'error': 'Kerberos SSO not available on this server'}), 501
+    # Verification + user resolution implemented in Task 6.
+    return jsonify({'error': 'not implemented'}), 501
 
 @app.route('/api/login-options', methods=['GET', 'OPTIONS'])
 def api_login_options():
