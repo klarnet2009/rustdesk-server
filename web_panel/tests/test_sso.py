@@ -61,3 +61,17 @@ def test_validate_bad_base64_raises(monkeypatch):
     monkeypatch.setattr(sso_kerberos, 'SPNEGO_AVAILABLE', True, raising=False)
     with pytest.raises(sso_kerberos.SsoError):
         sso_kerberos.validate_negotiate_token('!!!not base64!!!', 'HTTP/rustdesk.test.local')
+
+
+import ldap_auth
+
+
+def test_groups_grant_admin_uses_defaults(db_path):
+    assert ldap_auth.groups_grant_admin(['Domain Users', 'Domain Admins']) is True
+    assert ldap_auth.groups_grant_admin(['Domain Users']) is False
+
+
+def test_ldap_lookup_user_none_when_unconfigured(db_path, monkeypatch):
+    # No ldap_* settings in the temp DB -> lookup returns None, never raises.
+    monkeypatch.setattr(ldap_auth, 'LDAP_AVAILABLE', True, raising=False)
+    assert ldap_auth.ldap_lookup_user('jdoe') is None

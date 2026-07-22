@@ -251,8 +251,53 @@ def sync_ldap_user_to_db(ldap_user, is_admin=False):
     
     conn.commit()
     conn.close()
-    
+
     return user_id
+
+
+def groups_grant_admin(groups):
+    """True if any of the user's AD groups is configured as an admin group."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT value FROM settings WHERE key = 'ldap_admin_groups'").fetchone()
+    conn.close()
+    if row and row['value'] and row['value'].strip():
+        admin_groups = [g.strip() for g in row['value'].split(',') if g.strip()]
+    else:
+        admin_groups = [
+            'Domain Admins', 'Administrators', 'Enterprise Admins',
+            'Администраторы домена', 'Администраторы', 'Admins', 'IT Admins', 'RustDesk Admins'
+        ]
+    return any(g in (groups or []) for g in admin_groups)
+
+
+def ldap_lookup_user(username):
+    """Look up an AD user by name using the service bind (no user password).
+
+    Returns {'username','email','display_name','groups'} or None. Never raises.
+    """
+    if not LDAP_AVAILABLE:
+        return None
+    config = get_ldap_config()
+    server_url = config.get('server', '')
+    base_dn = config.get('base_dn', '')
+    bind_dn = config.get('bind_dn', '')
+    bind_password = config.get('bind_password', '')
+    if not server_url or not base_dn or not bind_dn:
+        return None
+    try:
+        server = Server(server_url, get_info=ALL)
+        conn = Connection(server, user=bind_dn, password=bind_password, authentication=NTLM)
+        if not conn.bind():
+            conn = Connection(server, user=bind_dn, password=bind_password, authentication=SIMPLE)
+            if not conn.bind():
+                return None
+        info = search_user(conn, base_dn, username)
+        conn.unbind()
+        return info
+    except Exception as e:
+        print(f"[LDAP] lookup_user failed for {username}: {e}")
+        return None
 
 
 def discover_base_dn(server_url, username=None, password=None):
