@@ -1857,6 +1857,29 @@ def web_login():
     
     return render_template_string(LOGIN_HTML, error=error)
 
+@app.route('/login-sso', methods=['GET'])
+def web_login_sso():
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Negotiate '):
+        resp = make_response('', 401)
+        resp.headers['WWW-Authenticate'] = 'Negotiate'
+        return resp
+    if not sso_kerberos.SPNEGO_AVAILABLE or not SSO_SPN:
+        return redirect(url_for('web_login'))
+    try:
+        principal = sso_kerberos.validate_negotiate_token(auth_header.split(' ', 1)[1], SSO_SPN)
+    except sso_kerberos.SsoError as e:
+        print(f"[SSO] browser validation failed: {e}")
+        return redirect(url_for('web_login'))
+    u = resolve_sso_user(principal)
+    if not u['is_admin']:
+        print(f"[SSO] browser login denied (not admin): {u['username']}")
+        return redirect(url_for('web_login'))
+    session['user_id'] = u['user_id']
+    session['username'] = u['username']
+    session['is_admin'] = True
+    return redirect(url_for('web_dashboard'))
+
 @app.route('/logout')
 def web_logout():
     session.clear()

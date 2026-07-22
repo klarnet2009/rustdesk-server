@@ -126,3 +126,37 @@ def test_login_sso_ssoerror_is_401(app_module, monkeypatch):
     monkeypatch.setattr(sk, 'validate_negotiate_token', boom, raising=False)
     resp = app_module.app.test_client().post('/api/login-sso', headers={'Authorization': 'Negotiate QQ=='})
     assert resp.status_code == 401
+
+
+def test_browser_sso_admin_gets_session(app_module, monkeypatch):
+    import sso_kerberos as sk
+    monkeypatch.setattr(sk, 'SPNEGO_AVAILABLE', True, raising=False)
+    monkeypatch.setattr(sk, 'validate_negotiate_token', lambda t, spn: 'boss@X', raising=False)
+    monkeypatch.setattr(app_module, 'resolve_sso_user',
+                        lambda p: {'user_id': 1, 'username': 'boss', 'is_admin': True, 'email': 'b@x'})
+    c = app_module.app.test_client()
+    resp = c.get('/login-sso', headers={'Authorization': 'Negotiate QQ=='})
+    assert resp.status_code == 302
+    assert '/dashboard' in resp.headers['Location']
+    with c.session_transaction() as s:
+        assert s['user_id'] == 1 and s['is_admin'] is True
+
+
+def test_browser_sso_nonadmin_denied(app_module, monkeypatch):
+    import sso_kerberos as sk
+    monkeypatch.setattr(sk, 'SPNEGO_AVAILABLE', True, raising=False)
+    monkeypatch.setattr(sk, 'validate_negotiate_token', lambda t, spn: 'jdoe@X', raising=False)
+    monkeypatch.setattr(app_module, 'resolve_sso_user',
+                        lambda p: {'user_id': 2, 'username': 'jdoe', 'is_admin': False, 'email': 'j@x'})
+    c = app_module.app.test_client()
+    resp = c.get('/login-sso', headers={'Authorization': 'Negotiate QQ=='})
+    assert resp.status_code == 302
+    assert '/login' in resp.headers['Location']
+    with c.session_transaction() as s:
+        assert 'user_id' not in s
+
+
+def test_browser_sso_challenges_without_auth(app_module):
+    resp = app_module.app.test_client().get('/login-sso')
+    assert resp.status_code == 401
+    assert resp.headers.get('WWW-Authenticate') == 'Negotiate'
