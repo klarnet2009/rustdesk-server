@@ -52,11 +52,11 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=21114
       - SSL_ENABLED=false
-      # Kerberos SSO: keytab path inside the container (drop rustdesk.keytab into
-      # ./data/web_panel on the host). SSO_SPN stays empty until activation — set
-      # the Coolify env SSO_SPN=HTTP/rustdesk.iterum.lv to turn SSO on.
+      # Kerberos SSO (ACTIVE): keytab at ./data/web_panel/rustdesk.keytab on the
+      # host -> /app/data/rustdesk.keytab in the container. SSO_SPN pins the SPN
+      # the acceptor validates against (public, not a secret).
       - KRB5_KTNAME=/app/data/rustdesk.keytab
-      - SSO_SPN=${SSO_SPN:-}
+      - SSO_SPN=HTTP/rustdesk.iterum.lv
     volumes:
       - ./data/web_panel:/app/data
     networks:
