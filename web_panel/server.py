@@ -623,11 +623,10 @@ BASE_HTML = r'''
                 const form = e.target;
                 const btn = form.querySelector('button[type="submit"]');
                 if (btn && form.checkValidity()) {
+                    const label = btn.dataset.loadingText || 'Working…';
                     btn.classList.add('btn-disabled');
-                    let btnText = btn.innerText.trim();
-                    if (btnText === "Add User") btnText = "Adding User…";
-                    else if (btnText === "Save Configuration") btnText = "Saving…";
-                    btn.innerHTML = `<span class="loading loading-spinner loading-sm" aria-hidden="true"></span> ${btnText}`;
+                    btn.disabled = true;
+                    btn.innerHTML = `<span class="loading loading-spinner loading-sm" aria-hidden="true"></span> ${label}`;
                 }
             });
         });
@@ -754,7 +753,7 @@ DASHBOARD_HTML = r'''
     <div class="stats shadow bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-secondary">
-                <div class="w-12 h-12 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 rounded-lg flex items-center justify-center">
+                <div class="w-12 h-12 bg-secondary/10 text-secondary rounded-lg flex items-center justify-center">
                     <i data-lucide="arrow-left-right" class="w-6 h-6" aria-hidden="true"></i>
                 </div>
             </div>
@@ -768,7 +767,7 @@ DASHBOARD_HTML = r'''
     <div class="stats shadow bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-warning">
-                <div class="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg flex items-center justify-center">
+                <div class="w-12 h-12 bg-warning/10 text-warning rounded-lg flex items-center justify-center">
                     <i data-lucide="users" class="w-6 h-6" aria-hidden="true"></i>
                 </div>
             </div>
@@ -833,7 +832,7 @@ DASHBOARD_HTML = r'''
                         <td>
                             {% if d.online %}
                             <span class="badge badge-success gap-1 text-xs font-semibold">
-                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                <span class="w-1.5 h-1.5 rounded-full bg-success-content motion-safe:animate-pulse"></span>
                                 Online
                             </span>
                             {% else %}
@@ -941,7 +940,7 @@ DEVICES_HTML = r'''
 {% block content %}
 <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold text-base-content text-balance">Devices</h1>
-    <button class="btn btn-primary" onclick="location.reload()">
+    <button class="btn btn-primary" onclick="this.classList.add('btn-disabled');this.disabled=true;this.innerHTML='<span class=&quot;loading loading-spinner loading-sm&quot; aria-hidden=&quot;true&quot;></span> Refreshing…';location.reload();">
         <i data-lucide="rotate-cw" class="w-4 h-4 mr-2" aria-hidden="true"></i>Refresh
     </button>
 </div>
@@ -976,7 +975,7 @@ DEVICES_HTML = r'''
                         <td>
                             {% if d.online %}
                             <span class="badge badge-success gap-1 text-xs font-semibold">
-                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                <span class="w-1.5 h-1.5 rounded-full bg-success-content motion-safe:animate-pulse"></span>
                                 Online
                             </span>
                             {% else %}
@@ -1184,7 +1183,7 @@ USERS_HTML = r'''
             </div>
             <div class="flex justify-end gap-3 mt-4">
                 <button type="button" class="btn btn-ghost" onclick="document.getElementById('addUserModal').close()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Add User</button>
+                <button type="submit" class="btn btn-primary" data-loading-text="Adding…">Add User</button>
             </div>
         </form>
     </div>
@@ -1534,7 +1533,7 @@ SETTINGS_HTML = r'''
                 </div>
                 
                 <div class="flex flex-wrap gap-3">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" data-loading-text="Saving…">
                         <i data-lucide="save" class="w-4 h-4 mr-1" aria-hidden="true"></i>Save Configuration
                     </button>
                     {% if ldap_config.get('enabled') %}
@@ -1706,7 +1705,7 @@ MY_DEVICES_HTML = r"""
                         <td>
                             {% if d.online %}
                             <span class="badge badge-success gap-1 text-xs font-semibold">
-                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                <span class="w-1.5 h-1.5 rounded-full bg-success-content motion-safe:animate-pulse"></span>
                                 Online
                             </span>
                             {% else %}
@@ -1750,10 +1749,10 @@ MY_DEVICES_HTML = r"""
                 <div class="relative">
                     <input type="password" id="device-password-input" class="input input-bordered w-full pr-20" name="password" placeholder="Enter password…" autocomplete="new-password" spellcheck="false">
                     <div class="absolute right-3 top-3 flex gap-1">
-                        <button type="button" class="opacity-50 hover:opacity-100" id="btn-generate-password" title="Generate password" aria-label="Generate random password">
+                        <button type="button" class="btn btn-ghost btn-xs btn-square" id="btn-generate-password" title="Generate password" aria-label="Generate random password">
                             <i data-lucide="dices" class="w-5 h-5" aria-hidden="true"></i>
                         </button>
-                        <button type="button" class="opacity-50 hover:opacity-100" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
+                        <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
                             <i data-lucide="eye" id="togglePasswordIcon" class="w-5 h-5" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -1762,7 +1761,7 @@ MY_DEVICES_HTML = r"""
             </div>
             <div class="flex justify-end gap-3 mt-4">
                 <button type="button" class="btn btn-ghost" onclick="document.getElementById('editPasswordModal').close()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Password</button>
+                <button type="submit" class="btn btn-primary" data-loading-text="Saving…">Save Password</button>
             </div>
         </form>
     </div>
