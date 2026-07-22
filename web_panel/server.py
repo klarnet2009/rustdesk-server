@@ -413,12 +413,13 @@ BASE_HTML = r'''
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="min-h-screen bg-base-200">
+    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 btn btn-primary btn-sm">Skip to content</a>
     <div class="drawer lg:drawer-open">
         <input id="sidebar-drawer" type="checkbox" class="drawer-toggle" />
         
         <div class="drawer-content flex flex-col min-h-screen">
             <!-- Top Navbar -->
-            <div class="navbar bg-base-100 border-b border-base-300 px-6 justify-between shadow-sm z-10">
+            <header class="navbar bg-base-100 border-b border-base-300 px-6 justify-between shadow-sm z-10">
                 <div class="flex-none lg:hidden">
                     <label for="sidebar-drawer" class="btn btn-square btn-ghost" aria-label="Toggle Sidebar">
                         <i data-lucide="menu" class="w-6 h-6" aria-hidden="true"></i>
@@ -435,11 +436,11 @@ BASE_HTML = r'''
                     
                     <!-- User Dropdown -->
                     <div class="dropdown dropdown-end">
-                        <div tabindex="0" role="button" class="btn btn-ghost m-1 flex items-center gap-2 normal-case font-medium">
+                        <button type="button" tabindex="0" aria-haspopup="menu" class="btn btn-ghost m-1 flex items-center gap-2 normal-case font-medium">
                             <i data-lucide="user" class="w-5 h-5 opacity-70" aria-hidden="true"></i>
                             {{ session.username }}
                             <i data-lucide="chevron-down" class="w-4 h-4 opacity-50" aria-hidden="true"></i>
-                        </div>
+                        </button>
                         <ul tabindex="0" class="dropdown-content z-[30] menu p-2 shadow bg-base-100 rounded-box w-52 border border-base-300 mt-2">
                             <li>
                                 <a href="{{ url_for('web_logout') }}" class="text-error">
@@ -449,12 +450,12 @@ BASE_HTML = r'''
                         </ul>
                     </div>
                 </div>
-            </div>
+            </header>
 
             <!-- Content Area -->
-            <div class="p-6 flex-grow bg-base-200">
+            <main id="main" class="p-6 flex-grow bg-base-200">
                 {% block content %}{% endblock %}
-            </div>
+            </main>
         </div>
 
         <!-- Sidebar -->
@@ -469,7 +470,8 @@ BASE_HTML = r'''
                     </a>
                 </div>
                 <!-- Nav Links -->
-                <ul class="menu menu-vertical p-0 gap-1 flex-grow">
+                <nav aria-label="Primary" class="flex-grow">
+                <ul class="menu menu-vertical p-0 gap-1">
                     <li>
                         <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'dashboard' else '' }}" href="{{ url_for('web_dashboard') }}">
                             <i data-lucide="layout-dashboard" class="w-5 h-5" aria-hidden="true"></i>
@@ -509,6 +511,7 @@ BASE_HTML = r'''
                     </li>
                     {% endif %}
                 </ul>
+                </nav>
                 <!-- Footer -->
                 <div class="mt-auto pt-4 border-t border-base-300">
                     <small class="text-base-content/60">RustDesk Panel v2.0</small>
@@ -669,7 +672,7 @@ LOGIN_HTML = r'''
                 <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                     <i data-lucide="monitor" class="w-8 h-8 text-primary" aria-hidden="true"></i>
                 </div>
-                <h2 class="card-title text-2xl font-bold text-base-content text-balance">RustDesk Panel</h2>
+                <h1 class="card-title text-2xl font-bold text-base-content text-balance">RustDesk Panel</h1>
                 <p class="text-sm text-base-content/60">Sign in to your account</p>
             </div>
             
@@ -827,14 +830,14 @@ DASHBOARD_HTML = r'''
             <table class="table table-zebra w-full">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Hostname</th>
-                        <th>User</th>
-                        <th>OS</th>
-                        <th>IP</th>
-                        <th>Status</th>
-                        <th>Last Seen</th>
-                        <th>Action</th>
+                        <th scope="col">ID</th>
+                        <th scope="col">Hostname</th>
+                        <th scope="col">User</th>
+                        <th scope="col">OS</th>
+                        <th scope="col">IP</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Last Seen</th>
+                        <th scope="col">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -968,15 +971,15 @@ DEVICES_HTML = r'''
             <table id="devicesTable" class="table table-zebra w-full">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Hostname</th>
-                        <th>Username</th>
-                        <th>OS</th>
-                        <th>IP Address</th>
-                        <th>Version</th>
-                        <th>Status</th>
-                        <th>Last Seen</th>
-                        <th>Actions</th>
+                        <th scope="col">ID</th>
+                        <th scope="col">Hostname</th>
+                        <th scope="col">Username</th>
+                        <th scope="col">OS</th>
+                        <th scope="col">IP Address</th>
+                        <th scope="col">Version</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Last Seen</th>
+                        <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1118,13 +1121,13 @@ USERS_HTML = r'''
             <table id="usersTable" class="table table-zebra w-full">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                        <th>Actions</th>
+                        <th scope="col">ID</th>
+                        <th scope="col">Username</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Created</th>
+                        <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1177,7 +1180,7 @@ USERS_HTML = r'''
         <form method="dialog">
             <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close modal">✕</button>
         </form>
-        <h3 class="font-bold text-lg text-balance mb-4">Add User</h3>
+        <h2 class="font-bold text-lg text-balance mb-4">Add User</h2>
         <form action="{{ url_for('web_add_user') }}" method="POST">
             <div class="form-control w-full mb-4">
                 <label class="label" for="add-username"><span class="label-text font-semibold">Username</span></label>
@@ -1247,11 +1250,11 @@ LOGS_HTML = r'''
             <table id="logsTable" class="table table-zebra w-full">
                 <thead>
                     <tr>
-                        <th>Time</th>
-                        <th>Type</th>
-                        <th>Device ID</th>
-                        <th>Peer ID</th>
-                        <th>Action</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Device ID</th>
+                        <th scope="col">Peer ID</th>
+                        <th scope="col">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1687,15 +1690,15 @@ MY_DEVICES_HTML = r"""
             <table id="myDevicesTable" class="table table-zebra w-full">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Hostname</th>
-                        <th>Username</th>
-                        <th>OS</th>
-                        <th>IP Address</th>
-                        <th>Password</th>
-                        <th>Status</th>
-                        <th>Last Seen</th>
-                        <th>Actions</th>
+                        <th scope="col">ID</th>
+                        <th scope="col">Hostname</th>
+                        <th scope="col">Username</th>
+                        <th scope="col">OS</th>
+                        <th scope="col">IP Address</th>
+                        <th scope="col">Password</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Last Seen</th>
+                        <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
