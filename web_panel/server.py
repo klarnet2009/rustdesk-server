@@ -43,6 +43,9 @@ except ImportError:
     def test_ldap_connection(): return False, "LDAP module not found"
     def sync_all_ldap_users(): return False, "LDAP module not found"
 
+import sso_kerberos
+SSO_SPN = os.environ.get('SSO_SPN', '')
+
 DB_PATH = os.environ.get('RUSTDESK_DB_PATH') or os.path.join(os.path.dirname(__file__), 'rustdesk.db')
 
 def _load_or_create_secret(env_var, settings_key):
@@ -2252,19 +2255,36 @@ def add_cors(response):
 def api_login_sso():
     if request.method == 'OPTIONS':
         return '', 200
-        
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Negotiate '):
-        response = make_response(jsonify({'error': 'Negotiate authentication required'}), 401)
-        response.headers['WWW-Authenticate'] = 'Negotiate'
-        return response
-        
-    token_b64 = auth_header.split(' ', 1)[1]
-    from sso_kerberos import SPNEGO_AVAILABLE
-    if not SPNEGO_AVAILABLE:
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Negotiate '):
+        resp = make_response(jsonify({'error': 'Negotiate authentication required'}), 401)
+        resp.headers['WWW-Authenticate'] = 'Negotiate'
+        return resp
+    if not sso_kerberos.SPNEGO_AVAILABLE:
         return jsonify({'error': 'Kerberos SSO not available on this server'}), 501
-    # Verification + user resolution implemented in Task 6.
-    return jsonify({'error': 'not implemented'}), 501
+    if not SSO_SPN:
+        return jsonify({'error': 'SSO_SPN not configured on this server'}), 501
+    token_b64 = auth_header.split(' ', 1)[1]
+    try:
+        principal = sso_kerberos.validate_negotiate_token(token_b64, SSO_SPN)
+    except sso_kerberos.SsoError as e:
+        print(f"[SSO] validation failed: {e}")
+        resp = make_response(jsonify({'error': 'Kerberos validation failed'}), 401)
+        resp.headers['WWW-Authenticate'] = 'Negotiate'
+        return resp
+    u = resolve_sso_user(principal)
+    access_token = create_token(u['user_id'], u['username'], u['is_admin'])
+    print(f"[SSO] client login OK: {u['username']} (admin={u['is_admin']})")
+    return jsonify({
+        'access_token': access_token,
+        'type': 'access_token',
+        'user': {
+            'name': u['username'],
+            'email': u['email'],
+            'is_admin': u['is_admin'],
+            'status': 'active',
+        },
+    })
 
 @app.route('/api/login-options', methods=['GET', 'OPTIONS'])
 def api_login_options():

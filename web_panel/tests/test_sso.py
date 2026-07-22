@@ -100,3 +100,29 @@ def test_resolve_admin_via_ldap_groups(app_module, monkeypatch):
     assert out['username'] == 'boss'
     assert out['is_admin'] is True
     assert out['email'] == 'boss@x.local'
+
+
+def test_login_sso_success_returns_jwt(app_module, monkeypatch):
+    import sso_kerberos as sk
+    monkeypatch.setattr(sk, 'SPNEGO_AVAILABLE', True, raising=False)
+    monkeypatch.setattr(app_module, 'validate_negotiate_token', lambda t, spn: 'jdoe@EXAMPLE.LOCAL', raising=False)
+    monkeypatch.setattr(sk, 'validate_negotiate_token', lambda t, spn: 'jdoe@EXAMPLE.LOCAL', raising=False)
+    monkeypatch.setattr(app_module, 'resolve_sso_user',
+                        lambda p: {'user_id': 7, 'username': 'jdoe', 'is_admin': False, 'email': 'jdoe@x'})
+    resp = app_module.app.test_client().post('/api/login-sso', headers={'Authorization': 'Negotiate QQ=='})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body['type'] == 'access_token'
+    assert body['access_token']
+    assert body['user']['name'] == 'jdoe'
+    assert body['user']['is_admin'] is False
+
+
+def test_login_sso_ssoerror_is_401(app_module, monkeypatch):
+    import sso_kerberos as sk
+    monkeypatch.setattr(sk, 'SPNEGO_AVAILABLE', True, raising=False)
+    def boom(t, spn):
+        raise sk.SsoError('bad ticket')
+    monkeypatch.setattr(sk, 'validate_negotiate_token', boom, raising=False)
+    resp = app_module.app.test_client().post('/api/login-sso', headers={'Authorization': 'Negotiate QQ=='})
+    assert resp.status_code == 401
