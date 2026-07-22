@@ -401,7 +401,15 @@ BASE_HTML = r'''
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - RustDesk Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="/static/output.css" rel="stylesheet">
+    <style>
+      body{font-family:'Open Sans',system-ui,-apple-system,sans-serif}
+      h1,h2,h3,.card-title,.stat-value,.navbar-brand,.brand{font-family:'Poppins',system-ui,sans-serif}
+      .card-title{font-size:1.125rem;line-height:1.4}
+    </style>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="min-h-screen bg-base-200">
@@ -643,7 +651,15 @@ LOGIN_HTML = r'''
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - RustDesk Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="/static/output.css" rel="stylesheet">
+    <style>
+      body{font-family:'Open Sans',system-ui,-apple-system,sans-serif}
+      h1,h2,h3,.card-title,.stat-value,.navbar-brand,.brand{font-family:'Poppins',system-ui,sans-serif}
+      .card-title{font-size:1.125rem;line-height:1.4}
+    </style>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="min-h-screen bg-base-200 flex items-center justify-center">
