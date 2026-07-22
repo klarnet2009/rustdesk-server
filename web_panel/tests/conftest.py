@@ -17,10 +17,18 @@ def db_path(monkeypatch):
 def app_module(db_path):
     # Import after RUSTDESK_DB_PATH is set so init_db() writes to the temp DB.
     import importlib
+    # Point ldap_auth's module-level DB_PATH at the temp DB for the duration of
+    # the test so LDAP writes (e.g. sync_ldap_user_to_db) hit the isolated temp
+    # DB rather than the real rustdesk.db captured at collection-time import.
+    # Restored on teardown so db_path-only tests keep their original binding.
+    import ldap_auth as ldap_mod
+    old_ldap_db = ldap_mod.DB_PATH
+    ldap_mod.DB_PATH = db_path
     import server as server_mod
     importlib.reload(server_mod)
     server_mod.init_db()
-    return server_mod
+    yield server_mod
+    ldap_mod.DB_PATH = old_ldap_db
 
 
 @pytest.fixture()
