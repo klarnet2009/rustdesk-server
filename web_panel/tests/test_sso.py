@@ -75,3 +75,28 @@ def test_ldap_lookup_user_none_when_unconfigured(db_path, monkeypatch):
     # No ldap_* settings in the temp DB -> lookup returns None, never raises.
     monkeypatch.setattr(ldap_auth, 'LDAP_AVAILABLE', True, raising=False)
     assert ldap_auth.ldap_lookup_user('jdoe') is None
+
+
+def test_resolve_minimal_jit_when_ldap_off(app_module, monkeypatch):
+    monkeypatch.setattr(app_module.ldap_auth, 'is_ldap_enabled', lambda: False)
+    out = app_module.resolve_sso_user('Jdoe@EXAMPLE.LOCAL')
+    assert out['username'] == 'jdoe'          # realm stripped, lowercased
+    assert out['is_admin'] is False
+    assert isinstance(out['user_id'], int)
+    # Row exists with empty password
+    conn = app_module.get_db()
+    row = conn.execute("SELECT password, is_admin FROM users WHERE username='jdoe'").fetchone()
+    conn.close()
+    assert row['password'] == ''
+    assert row['is_admin'] == 0
+
+
+def test_resolve_admin_via_ldap_groups(app_module, monkeypatch):
+    monkeypatch.setattr(app_module.ldap_auth, 'is_ldap_enabled', lambda: True)
+    monkeypatch.setattr(app_module.ldap_auth, 'ldap_lookup_user',
+                        lambda u: {'username': 'boss', 'email': 'boss@x.local',
+                                   'display_name': 'The Boss', 'groups': ['Domain Admins']})
+    out = app_module.resolve_sso_user('boss@EXAMPLE.LOCAL')
+    assert out['username'] == 'boss'
+    assert out['is_admin'] is True
+    assert out['email'] == 'boss@x.local'

@@ -26,6 +26,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 # LDAP Module
 try:
+    import ldap_auth
     from ldap_auth import (
         ldap_authenticate,
         is_ldap_enabled,
@@ -316,6 +317,39 @@ def create_token(user_id, username, is_admin):
         'is_admin': is_admin,
         'exp': time.time() + 86400 * 30
     }, get_jwt_secret(), algorithm="HS256")
+
+def resolve_sso_user(principal):
+    """Map a verified Kerberos principal to a panel user.
+
+    LDAP enabled + found -> enrich (email, display_name, admin-by-group) + JIT.
+    Otherwise -> minimal JIT (non-admin, empty password, synthesized email).
+    Returns {'user_id', 'username', 'is_admin', 'email'}.
+    """
+    username = sanitize_field(principal.split('@')[0].strip().lower(), 64)
+    realm = principal.split('@', 1)[1].lower() if '@' in principal else 'domain.local'
+
+    if ldap_auth.is_ldap_enabled():
+        info = ldap_auth.ldap_lookup_user(username)
+        if info:
+            is_admin = ldap_auth.groups_grant_admin(info.get('groups'))
+            user_id = ldap_auth.sync_ldap_user_to_db(info, is_admin)
+            return {'user_id': user_id, 'username': info['username'],
+                    'is_admin': is_admin, 'email': info.get('email', '')}
+
+    # Minimal JIT
+    email = f"{username}@{realm}"
+    conn = get_db()
+    row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if row:
+        user_id = row['id']
+    else:
+        cur = conn.cursor()
+        cur.execute("INSERT INTO users (username, password, email, is_admin, status) VALUES (?, '', ?, 0, 1)",
+                    (username, email))
+        user_id = cur.lastrowid
+        conn.commit()
+    conn.close()
+    return {'user_id': user_id, 'username': username, 'is_admin': False, 'email': email}
 
 def token_required(f):
     @wraps(f)
