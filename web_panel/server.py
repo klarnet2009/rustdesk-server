@@ -417,7 +417,7 @@ BASE_HTML = r'''
                     </label>
                 </div>
                 <div class="flex-grow">
-                    <span class="text-sm opacity-60 tabular-nums">{{ current_time }}</span>
+                    <span class="text-sm text-base-content/70 tabular-nums">{{ current_time }}</span>
                 </div>
                 <div class="flex-none gap-2">
                     <!-- Theme Toggle -->
@@ -696,7 +696,7 @@ DASHBOARD_HTML = r'''
             </div>
             <div>
                 <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.total }}</div>
-                <div class="stat-title text-sm opacity-60">Total Devices</div>
+                <div class="stat-title text-sm text-base-content/70">Total Devices</div>
             </div>
         </div>
     </div>
@@ -710,7 +710,7 @@ DASHBOARD_HTML = r'''
             </div>
             <div>
                 <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.online }}</div>
-                <div class="stat-title text-sm opacity-60">Online Now</div>
+                <div class="stat-title text-sm text-base-content/70">Online Now</div>
             </div>
         </div>
     </div>
@@ -724,7 +724,7 @@ DASHBOARD_HTML = r'''
             </div>
             <div>
                 <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.connections_today }}</div>
-                <div class="stat-title text-sm opacity-60">Connections Today</div>
+                <div class="stat-title text-sm text-base-content/70">Connections Today</div>
             </div>
         </div>
     </div>
@@ -738,7 +738,7 @@ DASHBOARD_HTML = r'''
             </div>
             <div>
                 <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.users }}</div>
-                <div class="stat-title text-sm opacity-60">Users</div>
+                <div class="stat-title text-sm text-base-content/70">Users</div>
             </div>
         </div>
     </div>
@@ -1010,15 +1010,15 @@ function showDetails(id) {
         <div class="overflow-x-auto">
             <table class="table table-compact w-full text-sm">
                 <tbody>
-                    <tr class="border-b border-base-200"><th class="w-24 opacity-60">ID</th><td><code class="font-mono font-semibold text-primary tabular-nums">${esc(d.id)}</code></td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Hostname</th><td>${esc(d.hostname) || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Username</th><td>${esc(d.username) || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">OS</th><td>${esc(d.os) || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">IP</th><td><span class="tabular-nums">${esc(d.ip) || '-'}</span></td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">CPU</th><td>${esc(d.cpu) || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Memory</th><td>${esc(d.memory) || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="opacity-60">Version</th><td><span class="tabular-nums">${esc(d.version) || '-'}</span></td></tr>
-                    <tr><th class="opacity-60">Last Seen</th><td><span class="tabular-nums">${esc(d.last_seen_str)}</span></td></tr>
+                    <tr class="border-b border-base-200"><th class="w-24 text-base-content/70">ID</th><td><code class="font-mono font-semibold text-primary tabular-nums">${esc(d.id)}</code></td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">Hostname</th><td>${esc(d.hostname) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">Username</th><td>${esc(d.username) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">OS</th><td>${esc(d.os) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">IP</th><td><span class="tabular-nums">${esc(d.ip) || '-'}</span></td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">CPU</th><td>${esc(d.cpu) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">Memory</th><td>${esc(d.memory) || '-'}</td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">Version</th><td><span class="tabular-nums">${esc(d.version) || '-'}</span></td></tr>
+                    <tr><th class="text-base-content/70">Last Seen</th><td><span class="tabular-nums">${esc(d.last_seen_str)}</span></td></tr>
                 </tbody>
             </table>
         </div>
@@ -1085,7 +1085,7 @@ USERS_HTML = r'''
                             <span class="badge badge-ghost text-xs font-semibold">Disabled</span>
                             {% endif %}
                         </td>
-                        <td><span class="text-sm opacity-70 tabular-nums">{{ u.created_at }}</span></td>
+                        <td><span class="text-sm text-base-content/70 tabular-nums">{{ u.created_at }}</span></td>
                         <td>
                             <button class="btn btn-sm btn-ghost text-error {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick='deleteUser({{ u.id }}, {{ u.username | tojson }})' {{ 'disabled' if u.username == 'admin' else '' }} aria-label="Delete user {{ u.username }}">
                                 <i data-lucide="trash-2" class="w-5 h-5" aria-hidden="true"></i>
@@ -1192,7 +1192,7 @@ LOGS_HTML = r'''
                 <tbody>
                     {% for log in logs %}
                     <tr class="hover">
-                        <td><span class="text-sm opacity-75 tabular-nums">{{ log.created_at }}</span></td>
+                        <td><span class="text-sm text-base-content/70 tabular-nums">{{ log.created_at }}</span></td>
                         <td>
                             {% if log.type == 'conn' %}
                             <span class="badge badge-accent text-xs font-semibold">conn</span>
@@ -1204,8 +1204,8 @@ LOGS_HTML = r'''
                             <span class="badge badge-ghost text-xs font-semibold">{{ log.type }}</span>
                             {% endif %}
                         </td>
-                        <td><code class="font-mono text-sm opacity-80 tabular-nums">{{ log.device_id or '-' }}</code></td>
-                        <td><code class="font-mono text-sm opacity-80 tabular-nums">{{ log.peer_id or '-' }}</code></td>
+                        <td><code class="font-mono text-sm text-base-content/70 tabular-nums">{{ log.device_id or '-' }}</code></td>
+                        <td><code class="font-mono text-sm text-base-content/70 tabular-nums">{{ log.peer_id or '-' }}</code></td>
                         <td>{{ log.action or '-' }}</td>
                     </tr>
                     {% endfor %}
@@ -1248,15 +1248,15 @@ SETTINGS_HTML = r'''
             <div class="card-body p-6">
                 <h2 class="card-title text-base font-semibold text-balance border-b border-base-200 pb-3 mb-4"><i data-lucide="server" class="text-primary w-5 h-5 mr-2" aria-hidden="true"></i>Server Configuration</h2>
                 <div class="form-control w-full mb-4">
-                    <label class="label" for="settings-id-server"><span class="label-text opacity-70">ID Server</span></label>
+                    <label class="label" for="settings-id-server"><span class="label-text text-base-content/70">ID Server</span></label>
                     <input type="text" id="settings-id-server" class="input input-bordered w-full bg-base-200 tabular-nums" value="{{ id_server }}" disabled>
                 </div>
                 <div class="form-control w-full mb-4">
-                    <label class="label" for="settings-relay-server"><span class="label-text opacity-70">Relay Server</span></label>
+                    <label class="label" for="settings-relay-server"><span class="label-text text-base-content/70">Relay Server</span></label>
                     <input type="text" id="settings-relay-server" class="input input-bordered w-full bg-base-200 tabular-nums" value="{{ relay_server }}" disabled>
                 </div>
                 <div class="form-control w-full">
-                    <label class="label" for="settings-api-server"><span class="label-text opacity-70">API Server</span></label>
+                    <label class="label" for="settings-api-server"><span class="label-text text-base-content/70">API Server</span></label>
                     <input type="text" id="settings-api-server" class="input input-bordered w-full bg-base-200" value="https://{{ request.host }}" disabled>
                 </div>
             </div>
@@ -1269,7 +1269,7 @@ SETTINGS_HTML = r'''
                     <table class="table table-compact w-full text-sm">
                         <tbody>
                             <tr class="border-b border-base-200">
-                                <td class="opacity-70">LDAP Library</td>
+                                <td class="text-base-content/70">LDAP Library</td>
                                 <td class="text-right">
                                     {% if ldap_available %}
                                     <span class="badge badge-success text-xs font-semibold">Installed</span>
@@ -1279,7 +1279,7 @@ SETTINGS_HTML = r'''
                                 </td>
                             </tr>
                             <tr>
-                                <td class="opacity-70">LDAP Status</td>
+                                <td class="text-base-content/70">LDAP Status</td>
                                 <td class="text-right">
                                     {% if ldap_config.get('enabled') %}
                                     <span class="badge badge-success text-xs font-semibold">Enabled</span>
@@ -1301,7 +1301,7 @@ SETTINGS_HTML = r'''
                 </h2>
                 
                 <form action="/settings/global" method="POST" id="globalSettingsForm">
-                    <h3 class="text-sm font-semibold opacity-70 mb-3">General Settings</h3>
+                    <h3 class="text-sm font-semibold text-base-content/70 mb-3">General Settings</h3>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div class="form-control w-full">
@@ -1327,7 +1327,7 @@ SETTINGS_HTML = r'''
                         </div>
                     </div>
 
-                    <h3 class="text-sm font-semibold opacity-70 mb-3 border-t border-base-200 pt-4">Security Settings</h3>
+                    <h3 class="text-sm font-semibold text-base-content/70 mb-3 border-t border-base-200 pt-4">Security Settings</h3>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
@@ -1450,22 +1450,22 @@ SETTINGS_HTML = r'''
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapServer"><span class="label-text font-semibold">AD Server Address</span></label>
                     <input type="text" class="input input-bordered w-full" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100… e.g. ldap://dc.company.local" value="{{ ldap_config.get('server', '') }}" autocomplete="off" spellcheck="false" required>
-                    <span class="label-text-alt opacity-50 mt-1 block">IP address or domain of the Domain Controller</span>
+                    <span class="label-text-alt text-base-content/70 mt-1 block">IP address or domain of the Domain Controller</span>
                 </div>
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapUser"><span class="label-text font-semibold">Service Account (Username)</span></label>
                     <input type="text" class="input input-bordered w-full" name="ldap_bind_dn" id="ldapUser" placeholder="admin@domain.local… e.g. bind_user@company.local" value="{{ ldap_config.get('bind_dn', '') }}" autocomplete="off" spellcheck="false" required>
-                    <span class="label-text-alt opacity-50 mt-1 block">UPN (user@domain.local) or traditional DOMAIN\user</span>
+                    <span class="label-text-alt text-base-content/70 mt-1 block">UPN (user@domain.local) or traditional DOMAIN\user</span>
                 </div>
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapPass"><span class="label-text font-semibold">Password</span></label>
                     <input type="password" class="input input-bordered w-full" name="ldap_bind_password" id="ldapPass" placeholder="Password…" autocomplete="new-password" spellcheck="false">
-                    <span class="label-text-alt opacity-50 mt-1 block">Only needed if changing existing configuration</span>
+                    <span class="label-text-alt text-base-content/70 mt-1 block">Only needed if changing existing configuration</span>
                 </div>
                 
                 {% if ldap_config.get('base_dn') %}
                 <div class="mb-4 p-3 bg-base-200 border border-base-300 rounded-lg text-sm flex items-center justify-between">
-                    <span class="opacity-60">Active Base DN:</span>
+                    <span class="text-base-content/70">Active Base DN:</span>
                     <code class="text-xs font-semibold text-primary tabular-nums">{{ ldap_config.get('base_dn') }}</code>
                 </div>
                 {% endif %}
@@ -1473,7 +1473,7 @@ SETTINGS_HTML = r'''
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapAdminGroups"><span class="label-text font-semibold">Admin LDAP Groups</span></label>
                     <input type="text" class="input input-bordered w-full" name="ldap_admin_groups" id="ldapAdminGroups" placeholder="Domain Admins, Administrators, RustDesk Admins…" value="{{ ldap_config.get('admin_groups', '') }}" autocomplete="off" spellcheck="false">
-                    <span class="label-text-alt opacity-50 mt-1 block">Comma-separated list of LDAP groups that map to the local Administrator role (others map to standard User role)</span>
+                    <span class="label-text-alt text-base-content/70 mt-1 block">Comma-separated list of LDAP groups that map to the local Administrator role (others map to standard User role)</span>
                 </div>
                 
                 <div class="form-control w-full mb-6">
@@ -1612,7 +1612,7 @@ MY_DEVICES_HTML = r"""
     <div class="card-body p-10 items-center text-center">
         <i data-lucide="monitor-off" class="w-12 h-12 opacity-30 mb-3" aria-hidden="true"></i>
         <h2 class="font-semibold text-lg">No devices yet</h2>
-        <p class="opacity-60 max-w-md">Sign in to your account in the RustDesk app on a device — it will appear here and in the address book of all your clients automatically.</p>
+        <p class="text-base-content/70 max-w-md">Sign in to your account in the RustDesk app on a device — it will appear here and in the address book of all your clients automatically.</p>
     </div>
 </div>
 {% else %}
@@ -1648,7 +1648,7 @@ MY_DEVICES_HTML = r"""
                         <td><span class="tabular-nums">{{ d.ip or '-' }}</span></td>
                         <td>
                             {% if d.password %}
-                            <span class="font-mono text-sm opacity-60">••••••••</span>
+                            <span class="font-mono text-sm text-base-content/70">••••••••</span>
                             {% else %}
                             <span class="badge badge-warning text-xs font-semibold">Not Set</span>
                             {% endif %}
@@ -1708,7 +1708,7 @@ MY_DEVICES_HTML = r"""
                         </button>
                     </div>
                 </div>
-                <span class="label-text-alt opacity-50 mt-2 block">Set the permanent password configured on the remote client.</span>
+                <span class="label-text-alt text-base-content/70 mt-2 block">Set the permanent password configured on the remote client.</span>
             </div>
             <div class="flex justify-end gap-3 mt-4">
                 <button type="button" class="btn btn-ghost" onclick="document.getElementById('editPasswordModal').close()">Cancel</button>
