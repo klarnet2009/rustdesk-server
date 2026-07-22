@@ -741,7 +741,7 @@ DASHBOARD_HTML = r'''
 
 <!-- Stats -->
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-    <div class="stats shadow bg-base-100 border border-base-300 p-2">
+    <div class="stats shadow-sm bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-primary">
                 <div class="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
@@ -755,7 +755,7 @@ DASHBOARD_HTML = r'''
         </div>
     </div>
     
-    <div class="stats shadow bg-base-100 border border-base-300 p-2">
+    <div class="stats shadow-sm bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-success">
                 <div class="w-12 h-12 bg-success/10 text-success rounded-lg flex items-center justify-center">
@@ -769,7 +769,7 @@ DASHBOARD_HTML = r'''
         </div>
     </div>
     
-    <div class="stats shadow bg-base-100 border border-base-300 p-2">
+    <div class="stats shadow-sm bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-secondary">
                 <div class="w-12 h-12 bg-secondary/10 text-secondary rounded-lg flex items-center justify-center">
@@ -783,7 +783,7 @@ DASHBOARD_HTML = r'''
         </div>
     </div>
     
-    <div class="stats shadow bg-base-100 border border-base-300 p-2">
+    <div class="stats shadow-sm bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-warning">
                 <div class="w-12 h-12 bg-warning/10 text-warning rounded-lg flex items-center justify-center">
@@ -804,7 +804,7 @@ DASHBOARD_HTML = r'''
         <div class="card-body p-5">
             <h2 class="card-title text-base font-semibold text-balance">Connections (Last 7&nbsp;Days)</h2>
             <div class="relative h-72">
-                <canvas id="connectionsChart"></canvas>
+                <canvas id="connectionsChart" role="img" aria-label="Connections over the last 7 days"></canvas>
             </div>
         </div>
     </div>
@@ -812,7 +812,7 @@ DASHBOARD_HTML = r'''
         <div class="card-body p-5">
             <h2 class="card-title text-base font-semibold text-balance">OS Distribution</h2>
             <div class="relative h-72">
-                <canvas id="osChart"></canvas>
+                <canvas id="osChart" role="img" aria-label="Operating-system distribution"></canvas>
             </div>
         </div>
     </div>
@@ -1141,7 +1141,7 @@ USERS_HTML = r'''
                         <td>{{ u.email or '-' }}</td>
                         <td>
                             {% if u.is_admin %}
-                            <span class="badge badge-error text-xs font-semibold">Admin</span>
+                            <span class="badge badge-primary text-xs font-semibold">Admin</span>
                             {% else %}
                             <span class="badge badge-ghost text-xs font-semibold">User</span>
                             {% endif %}
