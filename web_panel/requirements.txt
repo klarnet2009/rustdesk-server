@@ -3,6 +3,8 @@ Flask-CORS>=4.0.0
 PyJWT>=2.8.0
 gunicorn>=21.0.0
 ldap3>=2.9.0
+pytest>=8.0.0
+pyspnego[kerberos]>=0.10.2
 
 
 

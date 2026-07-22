@@ -42,7 +42,7 @@ except ImportError:
     def test_ldap_connection(): return False, "LDAP module not found"
     def sync_all_ldap_users(): return False, "LDAP module not found"
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rustdesk.db')
+DB_PATH = os.environ.get('RUSTDESK_DB_PATH') or os.path.join(os.path.dirname(__file__), 'rustdesk.db')
 
 def _load_or_create_secret(env_var, settings_key):
     """Resolve a persistent secret: env var > settings table > generate once.

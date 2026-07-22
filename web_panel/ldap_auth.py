@@ -14,7 +14,7 @@ except ImportError:
     LDAP_AVAILABLE = False
     print("[LDAP] ldap3 not installed. Run: pip install ldap3")
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rustdesk.db')
+DB_PATH = os.environ.get('RUSTDESK_DB_PATH') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rustdesk.db')
 
 
 def get_ldap_config():
