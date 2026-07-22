@@ -594,8 +594,8 @@ LOGIN_HTML = r'''
             
             {% if error %}
             <div class="alert alert-error shadow-sm mb-4" aria-live="polite">
-                <i data-lucide="alert-circle" class="w-5 h-5 text-white" aria-hidden="true"></i>
-                <span class="text-sm font-semibold text-white">{{ error }}</span>
+                <i data-lucide="alert-circle" class="w-5 h-5" aria-hidden="true"></i>
+                <span class="text-sm font-semibold">{{ error }}</span>
             </div>
             {% endif %}
             
@@ -617,7 +617,7 @@ LOGIN_HTML = r'''
                 </div>
                 
                 <div class="card-actions justify-end mt-6">
-                    <button type="submit" class="btn btn-primary w-full text-white">
+                    <button type="submit" class="btn btn-primary w-full">
                         <i data-lucide="log-in" class="w-4 h-4" aria-hidden="true"></i> Sign In
                     </button>
                 </div>
@@ -660,7 +660,7 @@ DASHBOARD_HTML = r'''
     <div class="stats shadow bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-primary">
-                <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center">
+                <div class="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
                     <i data-lucide="monitor" class="w-6 h-6" aria-hidden="true"></i>
                 </div>
             </div>
@@ -674,7 +674,7 @@ DASHBOARD_HTML = r'''
     <div class="stats shadow bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-success">
-                <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg flex items-center justify-center">
+                <div class="w-12 h-12 bg-success/10 text-success rounded-lg flex items-center justify-center">
                     <i data-lucide="wifi" class="w-6 h-6" aria-hidden="true"></i>
                 </div>
             </div>
@@ -765,7 +765,7 @@ DASHBOARD_HTML = r'''
                         <td><span class="tabular-nums">{{ d.ip or '-' }}</span></td>
                         <td>
                             {% if d.online %}
-                            <span class="badge badge-success gap-1 text-white text-xs font-semibold">
+                            <span class="badge badge-success gap-1 text-xs font-semibold">
                                 <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                                 Online
                             </span>
@@ -775,7 +775,7 @@ DASHBOARD_HTML = r'''
                         </td>
                         <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
                         <td>
-                            <button class="btn btn-primary btn-sm text-white" onclick='connectTo({{ d.id | tojson }})' aria-label="Connect to device {{ d.id }}">
+                            <button class="btn btn-primary btn-sm" onclick='connectTo({{ d.id | tojson }})' aria-label="Connect to device {{ d.id }}">
                                 <i data-lucide="link" class="w-4 h-4" aria-hidden="true"></i> Connect
                             </button>
                         </td>
@@ -853,7 +853,7 @@ DEVICES_HTML = r'''
 {% block content %}
 <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold text-base-content text-balance">Devices</h1>
-    <button class="btn btn-primary text-white" onclick="location.reload()">
+    <button class="btn btn-primary" onclick="location.reload()">
         <i data-lucide="rotate-cw" class="w-4 h-4 mr-2" aria-hidden="true"></i>Refresh
     </button>
 </div>
@@ -886,7 +886,7 @@ DEVICES_HTML = r'''
                         <td><span class="tabular-nums">{{ d.version or '-' }}</span></td>
                         <td>
                             {% if d.online %}
-                            <span class="badge badge-success gap-1 text-white text-xs font-semibold">
+                            <span class="badge badge-success gap-1 text-xs font-semibold">
                                 <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                                 Online
                             </span>
@@ -896,7 +896,7 @@ DEVICES_HTML = r'''
                         </td>
                         <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
                         <td class="flex gap-1">
-                            <button class="btn btn-primary btn-sm btn-square text-white" onclick='connectTo({{ d.id | tojson }})' title="Connect" aria-label="Connect to device {{ d.id }}">
+                            <button class="btn btn-primary btn-sm btn-square" onclick='connectTo({{ d.id | tojson }})' title="Connect" aria-label="Connect to device {{ d.id }}">
                                 <i data-lucide="link" class="w-4 h-4" aria-hidden="true"></i>
                             </button>
                             <button class="btn btn-outline btn-sm btn-square" onclick='showDetails({{ d.id | tojson }})' title="Details" aria-label="View details for device {{ d.id }}">
@@ -974,7 +974,7 @@ function showDetails(id) {
                 </tbody>
             </table>
         </div>
-        <button id="detailsConnectBtn" class="btn btn-primary w-full mt-4 text-white" aria-label="Connect to device">
+        <button id="detailsConnectBtn" class="btn btn-primary w-full mt-4" aria-label="Connect to device">
             <i data-lucide="link" class="w-4 h-4 mr-2" aria-hidden="true"></i>Connect
         </button>
     `;
@@ -993,7 +993,7 @@ USERS_HTML = r'''
 {% block content %}
 <div class="flex justify-between items-center mb-6">
     <h1 class="text-2xl font-bold text-base-content text-balance">Users</h1>
-    <button class="btn btn-primary text-white" onclick="document.getElementById('addUserModal').showModal()">
+    <button class="btn btn-primary" onclick="document.getElementById('addUserModal').showModal()">
         <i data-lucide="user-plus" class="w-4 h-4 mr-2" aria-hidden="true"></i>Add User
     </button>
 </div>
@@ -1024,21 +1024,21 @@ USERS_HTML = r'''
                         <td>{{ u.email or '-' }}</td>
                         <td>
                             {% if u.is_admin %}
-                            <span class="badge badge-error text-white text-xs font-semibold">Admin</span>
+                            <span class="badge badge-error text-xs font-semibold">Admin</span>
                             {% else %}
                             <span class="badge badge-ghost text-xs font-semibold">User</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if u.status == 1 %}
-                            <span class="badge badge-success text-white text-xs font-semibold">Active</span>
+                            <span class="badge badge-success text-xs font-semibold">Active</span>
                             {% else %}
                             <span class="badge badge-ghost text-xs font-semibold">Disabled</span>
                             {% endif %}
                         </td>
                         <td><span class="text-sm opacity-70 tabular-nums">{{ u.created_at }}</span></td>
                         <td>
-                            <button class="btn btn-sm btn-ghost text-red-600 {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick='deleteUser({{ u.id }}, {{ u.username | tojson }})' {{ 'disabled' if u.username == 'admin' else '' }} aria-label="Delete user {{ u.username }}">
+                            <button class="btn btn-sm btn-ghost text-error {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick='deleteUser({{ u.id }}, {{ u.username | tojson }})' {{ 'disabled' if u.username == 'admin' else '' }} aria-label="Delete user {{ u.username }}">
                                 <i data-lucide="trash-2" class="w-5 h-5" aria-hidden="true"></i>
                             </button>
                         </td>
@@ -1078,7 +1078,7 @@ USERS_HTML = r'''
             </div>
             <div class="flex justify-end gap-3 mt-4">
                 <button type="button" class="btn btn-ghost" onclick="document.getElementById('addUserModal').close()">Cancel</button>
-                <button type="submit" class="btn btn-primary text-white">Add User</button>
+                <button type="submit" class="btn btn-primary">Add User</button>
             </div>
         </form>
     </div>
@@ -1136,11 +1136,11 @@ LOGS_HTML = r'''
                         <td><span class="text-sm opacity-75 tabular-nums">{{ log.created_at }}</span></td>
                         <td>
                             {% if log.type == 'conn' %}
-                            <span class="badge badge-accent text-white text-xs font-semibold">conn</span>
+                            <span class="badge badge-accent text-xs font-semibold">conn</span>
                             {% elif log.type == 'file' %}
-                            <span class="badge badge-warning text-white text-xs font-semibold">file</span>
+                            <span class="badge badge-warning text-xs font-semibold">file</span>
                             {% elif log.type == 'alarm' %}
-                            <span class="badge badge-error text-white text-xs font-semibold">alarm</span>
+                            <span class="badge badge-error text-xs font-semibold">alarm</span>
                             {% else %}
                             <span class="badge badge-ghost text-xs font-semibold">{{ log.type }}</span>
                             {% endif %}
@@ -1204,7 +1204,7 @@ SETTINGS_HTML = r'''
                                 <td class="opacity-70">LDAP Library</td>
                                 <td class="text-right">
                                     {% if ldap_available %}
-                                    <span class="badge badge-success text-white text-xs font-semibold">Installed</span>
+                                    <span class="badge badge-success text-xs font-semibold">Installed</span>
                                     {% else %}
                                     <span class="badge badge-ghost text-xs font-semibold">Not installed</span>
                                     {% endif %}
@@ -1214,7 +1214,7 @@ SETTINGS_HTML = r'''
                                 <td class="opacity-70">LDAP Status</td>
                                 <td class="text-right">
                                     {% if ldap_config.get('enabled') %}
-                                    <span class="badge badge-success text-white text-xs font-semibold">Enabled</span>
+                                    <span class="badge badge-success text-xs font-semibold">Enabled</span>
                                     {% else %}
                                     <span class="badge badge-ghost text-xs font-semibold">Disabled</span>
                                     {% endif %}
@@ -1357,7 +1357,7 @@ SETTINGS_HTML = r'''
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary text-white w-full">
+                    <button type="submit" class="btn btn-primary w-full">
                         <i data-lucide="save" class="w-4 h-4 mr-1" aria-hidden="true"></i>Apply Global Settings
                     </button>
                 </form>
@@ -1416,7 +1416,7 @@ SETTINGS_HTML = r'''
                 </div>
                 
                 <div class="flex flex-wrap gap-3">
-                    <button type="submit" class="btn btn-primary text-white">
+                    <button type="submit" class="btn btn-primary">
                         <i data-lucide="save" class="w-4 h-4 mr-1" aria-hidden="true"></i>Save Configuration
                     </button>
                     {% if ldap_config.get('enabled') %}
@@ -1479,7 +1479,7 @@ function testLdap() {
     
     const resultDiv = document.getElementById('ldapTestResult');
     resultDiv.className = 'alert alert-info shadow-sm flex items-center gap-2';
-    resultDiv.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-600" aria-hidden="true"></i>Testing connection and discovering Base DN…';
+    resultDiv.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin" aria-hidden="true"></i>Testing connection and discovering Base DN…';
     resultDiv.classList.remove('hidden');
     if (window.lucide) { lucide.createIcons(); }
     
@@ -1492,13 +1492,13 @@ function testLdap() {
         .then(data => {
             if (data.success) {
                 resultDiv.className = 'alert alert-success shadow-sm flex items-center gap-2';
-                resultDiv.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4 text-green-600" aria-hidden="true"></i>' + data.message;
+                resultDiv.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4" aria-hidden="true"></i>' + data.message;
                 if (data.base_dn) {
                     document.getElementById('discoveredBaseDn').value = data.base_dn;
                 }
             } else {
-                resultDiv.className = 'alert alert-danger shadow-sm flex items-center gap-2';
-                resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600" aria-hidden="true"></i>' + data.message;
+                resultDiv.className = 'alert alert-error shadow-sm flex items-center gap-2';
+                resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4" aria-hidden="true"></i>' + data.message;
                 if (!data.ldap_available) {
                     resultDiv.innerHTML += '<br><small>Install ldap3: <code>pip install ldap3</code></small>';
                 }
@@ -1506,8 +1506,8 @@ function testLdap() {
             if (window.lucide) { lucide.createIcons(); }
         })
         .catch(err => {
-            resultDiv.className = 'alert alert-danger shadow-sm flex items-center gap-2';
-            resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600" aria-hidden="true"></i>Connection test failed: ' + err;
+            resultDiv.className = 'alert alert-error shadow-sm flex items-center gap-2';
+            resultDiv.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4" aria-hidden="true"></i>Connection test failed: ' + err;
             if (window.lucide) { lucide.createIcons(); }
         });
 }
@@ -1587,7 +1587,7 @@ MY_DEVICES_HTML = r"""
                         </td>
                         <td>
                             {% if d.online %}
-                            <span class="badge badge-success gap-1 text-white text-xs font-semibold">
+                            <span class="badge badge-success gap-1 text-xs font-semibold">
                                 <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                                 Online
                             </span>
@@ -1597,14 +1597,14 @@ MY_DEVICES_HTML = r"""
                         </td>
                         <td><span class="tabular-nums js-last-seen" data-ts="{{ d.last_seen_iso }}">-</span></td>
                         <td class="flex gap-1">
-                            <button type="button" class="btn btn-primary btn-sm text-white js-connect" data-id="{{ d.id }}" data-password="{{ d.password }}" title="Connect" aria-label="Connect to device {{ d.id }}">
+                            <button type="button" class="btn btn-primary btn-sm js-connect" data-id="{{ d.id }}" data-password="{{ d.password }}" title="Connect" aria-label="Connect to device {{ d.id }}">
                                 <i data-lucide="link" class="w-4 h-4 mr-1" aria-hidden="true"></i>Connect
                             </button>
                             <button type="button" class="btn btn-outline btn-sm btn-square js-edit-password" data-id="{{ d.id }}" data-password="{{ d.password }}" title="Set Password" aria-label="Set password for device {{ d.id }}">
                                 <i data-lucide="key" class="w-4 h-4" aria-hidden="true"></i>
                             </button>
                             <form action="/my-devices/unclaim/{{ d.id }}" method="POST" class="inline js-unclaim" data-hostname="{{ d.hostname or d.id }}">
-                                <button type="submit" class="btn btn-ghost btn-sm btn-square text-red-600" title="Remove Device" aria-label="Unclaim device {{ d.id }}">
+                                <button type="submit" class="btn btn-ghost btn-sm btn-square text-error" title="Remove Device" aria-label="Unclaim device {{ d.id }}">
                                     <i data-lucide="trash-2" class="w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </form>
@@ -1644,7 +1644,7 @@ MY_DEVICES_HTML = r"""
             </div>
             <div class="flex justify-end gap-3 mt-4">
                 <button type="button" class="btn btn-ghost" onclick="document.getElementById('editPasswordModal').close()">Cancel</button>
-                <button type="submit" class="btn btn-primary text-white">Save Password</button>
+                <button type="submit" class="btn btn-primary">Save Password</button>
             </div>
         </form>
     </div>
