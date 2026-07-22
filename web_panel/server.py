@@ -513,6 +513,36 @@ BASE_HTML = r'''
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Shared DataTables -> DaisyUI styling helper (P3).
+        // Wraps DataTables init so the injected filter box, length menu, info
+        // line and pagination get DaisyUI classes instead of browser defaults
+        // (which fail contrast in the dark "business" theme). Callers pass the
+        // same options they'd give .DataTable(); pageLength / language / order
+        // are preserved. Re-applies on every draw (pagination is regenerated).
+        window.initDataTable = function(selector, opts) {
+            opts = opts || {};
+            function styleControls(settings) {
+                const wrap = $(settings.nTableWrapper);
+                wrap.find('.dataTables_filter input').addClass('input input-bordered input-sm');
+                wrap.find('.dataTables_length select').addClass('select select-bordered select-sm');
+                wrap.find('.dataTables_info').addClass('text-sm text-base-content/70');
+                wrap.find('.dataTables_paginate .paginate_button').addClass('btn btn-sm btn-ghost');
+                wrap.find('.dataTables_paginate .paginate_button.current').addClass('btn-active');
+                if (window.lucide) { lucide.createIcons(); }
+            }
+            const userInitComplete = opts.initComplete;
+            const userDrawCallback = opts.drawCallback;
+            opts.initComplete = function(settings, json) {
+                styleControls(settings);
+                if (typeof userInitComplete === 'function') { userInitComplete.call(this, settings, json); }
+            };
+            opts.drawCallback = function(settings) {
+                styleControls(settings);
+                if (typeof userDrawCallback === 'function') { userDrawCallback.call(this, settings); }
+            };
+            return $(selector).DataTable(opts);
+        };
+
         // Theme toggle
         function toggleTheme() {
             const html = document.documentElement;
@@ -930,7 +960,7 @@ DEVICES_HTML = r'''
 {% block scripts %}
 <script>
 $(document).ready(function() {
-    $('#devicesTable').DataTable({
+    window.initDataTable('#devicesTable', {
         order: [[7, 'desc']],
         pageLength: 25,
         search: {
@@ -1091,7 +1121,7 @@ USERS_HTML = r'''
 {% block scripts %}
 <script>
 $(document).ready(function() {
-    $('#usersTable').DataTable();
+    window.initDataTable('#usersTable', {});
 });
 
 function deleteUser(id, username) {
@@ -1160,7 +1190,7 @@ LOGS_HTML = r'''
 {% block scripts %}
 <script>
 $(document).ready(function() {
-    $('#logsTable').DataTable({
+    window.initDataTable('#logsTable', {
         order: [[0, 'desc']],
         pageLength: 50
     });
@@ -1667,7 +1697,7 @@ const ID_SERVER = {{ id_server | tojson }};
 
 $(document).ready(function() {
     if ($.fn.DataTable && $('#myDevicesTable tbody tr').length) {
-        $('#myDevicesTable').DataTable({
+        window.initDataTable('#myDevicesTable', {
             pageLength: 25,
             language: {
                 search: "Search:",
