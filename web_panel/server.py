@@ -1528,8 +1528,7 @@ SETTINGS_HTML = r'''
             <div id="ldapTestResult" class="alert hidden mb-4 shadow-sm" aria-live="polite"></div>
             
             <form action="{{ url_for('web_save_ldap') }}" method="POST" id="ldapForm">
-                <input type="hidden" name="ldap_base_dn" id="discoveredBaseDn" value="{{ ldap_config.get('base_dn', '') }}">
-                
+
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapServer"><span class="label-text font-semibold">AD Server Address</span></label>
                     <input type="text" class="input input-bordered w-full" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100… e.g. ldap://dc.company.local" value="{{ ldap_config.get('server', '') }}" autocomplete="off" spellcheck="false" required>
@@ -1546,12 +1545,11 @@ SETTINGS_HTML = r'''
                     <span class="label-text-alt text-base-content/70 mt-1 block">Only needed if changing existing configuration</span>
                 </div>
                 
-                {% if ldap_config.get('base_dn') %}
-                <div class="mb-4 p-3 bg-base-200 border border-base-300 rounded-lg text-sm flex items-center justify-between">
-                    <span class="text-base-content/70">Active Base DN:</span>
-                    <code class="text-xs font-semibold text-primary tabular-nums">{{ ldap_config.get('base_dn') }}</code>
+                <div class="form-control w-full mb-4">
+                    <label class="label" for="ldapBaseDn"><span class="label-text font-semibold">Search Base DN</span></label>
+                    <input type="text" class="input input-bordered w-full font-mono text-sm" name="ldap_base_dn" id="ldapBaseDn" placeholder="OU=Staff,DC=company,DC=local… (empty = auto-discover domain root)" value="{{ ldap_config.get('base_dn', '') }}" autocomplete="off" spellcheck="false">
+                    <span class="label-text-alt text-base-content/70 mt-1 block">Users are searched only under this DN — point it at a specific OU to limit who can sign in. "Auto-Discover &amp; Test" fills in the domain root when left empty.</span>
                 </div>
-                {% endif %}
                 
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapAdminGroups"><span class="label-text font-semibold">Admin LDAP Groups</span></label>
@@ -1606,8 +1604,11 @@ function testLdap() {
             if (data.success) {
                 resultDiv.className = 'alert alert-success shadow-sm flex items-center gap-2';
                 resultDiv.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4" aria-hidden="true"></i>' + data.message;
-                if (data.base_dn) {
-                    document.getElementById('discoveredBaseDn').value = data.base_dn;
+                // Fill the Base DN field only when the admin hasn't chosen one
+                // (never overwrite a manually configured OU)
+                const baseDnInput = document.getElementById('ldapBaseDn');
+                if (data.base_dn && baseDnInput && !baseDnInput.value.trim()) {
+                    baseDnInput.value = data.base_dn;
                 }
             } else {
                 resultDiv.className = 'alert alert-error shadow-sm flex items-center gap-2';
@@ -2247,10 +2248,10 @@ def web_settings():
 def web_save_ldap():
     conn = get_db()
     settings = {
-        'ldap_server': request.form.get('ldap_server', ''),
-        'ldap_base_dn': request.form.get('ldap_base_dn', ''),
-        'ldap_bind_dn': request.form.get('ldap_bind_dn', ''),
-        'ldap_admin_groups': request.form.get('ldap_admin_groups', ''),
+        'ldap_server': request.form.get('ldap_server', '').strip(),
+        'ldap_base_dn': request.form.get('ldap_base_dn', '').strip(),
+        'ldap_bind_dn': request.form.get('ldap_bind_dn', '').strip(),
+        'ldap_admin_groups': request.form.get('ldap_admin_groups', '').strip(),
         'ldap_enabled': '1' if request.form.get('ldap_enabled') else '0'
     }
     
