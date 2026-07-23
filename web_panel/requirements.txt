@@ -5,6 +5,7 @@ gunicorn>=21.0.0
 ldap3>=2.9.0
 pytest>=8.0.0
 pyspnego[kerberos]>=0.10.2
+pycryptodome>=3.20.0  # provides MD4 for ldap3 NTLM bind (OpenSSL 3 dropped it)
 
 
 

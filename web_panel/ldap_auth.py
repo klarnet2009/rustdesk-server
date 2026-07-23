@@ -14,6 +14,25 @@ except ImportError:
     LDAP_AVAILABLE = False
     print("[LDAP] ldap3 not installed. Run: pip install ldap3")
 
+# OpenSSL 3 (the python:3.12-slim base image) dropped MD4 from the default provider,
+# but ldap3's NTLM bind computes the NT hash via hashlib.new('MD4', ...), which then
+# raises "unsupported hash type MD4" and breaks NTLM auth against AD. Restore MD4 via
+# pycryptodome so NTLM works without enabling the OpenSSL legacy provider.
+import hashlib
+try:
+    hashlib.new('md4')
+except ValueError:
+    try:
+        from Crypto.Hash import MD4 as _PyMD4
+        _orig_hashlib_new = hashlib.new
+        def _hashlib_new_with_md4(name, data=b'', **kwargs):
+            if str(name).lower() == 'md4':
+                return _PyMD4.new(data or b'')
+            return _orig_hashlib_new(name, data, **kwargs)
+        hashlib.new = _hashlib_new_with_md4
+    except Exception as _md4_err:
+        print(f"[LDAP] MD4 shim unavailable ({_md4_err}); NTLM bind may fail")
+
 DB_PATH = os.environ.get('RUSTDESK_DB_PATH') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rustdesk.db')
 
 
