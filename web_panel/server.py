@@ -12,7 +12,6 @@ from functools import wraps
 import jwt
 import json
 import time
-import threading
 import hashlib
 import hmac
 import re
@@ -32,7 +31,6 @@ try:
         is_ldap_enabled,
         sync_ldap_user_to_db,
         test_ldap_connection,
-        sync_all_ldap_users,
         LDAP_AVAILABLE
     )
 except ImportError:
@@ -41,7 +39,6 @@ except ImportError:
     def is_ldap_enabled(): return False
     def sync_ldap_user_to_db(u, a=False): return None
     def test_ldap_connection(): return False, "LDAP module not found"
-    def sync_all_ldap_users(): return False, "LDAP module not found"
 
 import sso_kerberos
 SSO_SPN = os.environ.get('SSO_SPN', '')
@@ -197,6 +194,37 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''")
         print("[DB] Added display_name column to users table")
 
+    # auth_source: 'local' = panel-managed password, 'ldap' = domain-managed (JIT).
+    # Domain rows never authenticate with a local password; local rows are never
+    # taken over by same-named domain accounts.
+    try:
+        c.execute("SELECT auth_source FROM users LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE users ADD COLUMN auth_source TEXT DEFAULT 'local'")
+        print("[DB] Added auth_source column to users table")
+
+    # One-time cleanup of the retired bulk LDAP sync artifacts:
+    # - its (objectClass=person) filter also imported AD computer/trust accounts
+    #   (sAMAccountName ends with '$') — drop them;
+    # - it stored the PREDICTABLE legacy-sha256 password sha256('ldap_<user>_<email>')
+    #   which verify_password() accepted as a login. Purge unreferenced rows (they
+    #   are re-created by JIT on next login); neutralize referenced ones.
+    deleted = c.execute("DELETE FROM users WHERE username LIKE '%$'").rowcount
+    for row in c.execute("SELECT id, username, email FROM users WHERE length(password) = 64").fetchall():
+        marker = hashlib.sha256(f"ldap_{row[1]}_{row[2]}".encode()).hexdigest()
+        if c.execute("SELECT 1 FROM users WHERE id = ? AND password = ?", (row[0], marker)).fetchone():
+            referenced = c.execute(
+                "SELECT 1 FROM devices WHERE user_id = ? UNION SELECT 1 FROM address_books WHERE user_id = ? LIMIT 1",
+                (row[0], row[0])).fetchone()
+            if referenced:
+                c.execute("UPDATE users SET password = ?, auth_source = 'ldap' WHERE id = ?",
+                          ('ldap$' + secrets.token_hex(16), row[0]))
+            else:
+                c.execute("DELETE FROM users WHERE id = ?", (row[0],))
+                deleted += 1
+    if deleted:
+        print(f"[DB] Purged {deleted} bulk-LDAP-sync artifact rows from users")
+
     conn.commit()
     conn.close()
 
@@ -281,36 +309,6 @@ def get_ldap_admin_groups(conn):
         'RustDesk Admins',
     ]
 
-def start_ldap_sync_scheduler():
-    # Only run the scheduler once in Flask's main process
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
-        def scheduler_loop():
-            # Wait 10 seconds after startup to avoid interfering with initialization
-            time.sleep(10)
-            while True:
-                try:
-                    conn = get_db()
-                    ldap_enabled = False
-                    try:
-                        row = conn.execute("SELECT value FROM settings WHERE key = 'ldap_enabled'").fetchone()
-                        ldap_enabled = (row and row['value'] == '1')
-                    finally:
-                        conn.close()
-                        
-                    if ldap_enabled:
-                        print("[LDAP Scheduler] Starting automatic background LDAP sync…")
-                        success, message = sync_all_ldap_users()
-                        print(f"[LDAP Scheduler] Sync finished: {message}")
-                except Exception as e:
-                    print(f"[LDAP Scheduler] Error during background sync: {e}")
-                
-                # Run every 6 hours (21600 seconds)
-                time.sleep(21600)
-                
-        thread = threading.Thread(target=scheduler_loop, daemon=True)
-        thread.start()
-        print("[LDAP Scheduler] Background sync scheduler thread started (runs every 6 hours)")
-
 # ==================== AUTH ====================
 
 def create_token(user_id, username, is_admin):
@@ -336,18 +334,27 @@ def resolve_sso_user(principal):
         if info:
             is_admin = ldap_auth.groups_grant_admin(info.get('groups'))
             user_id = ldap_auth.sync_ldap_user_to_db(info, is_admin)
+            if user_id is None:
+                # Collides with a panel-managed local account — never let a
+                # domain principal impersonate it.
+                print(f"[SSO] '{username}' collides with a local account, refusing SSO mapping")
+                return None
             return {'user_id': user_id, 'username': info['username'],
                     'is_admin': is_admin, 'email': info.get('email', '')}
 
-    # Minimal JIT
+    # Minimal JIT (domain-managed row; empty password is unusable for login)
     email = f"{username}@{realm}"
     conn = get_db()
-    row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    row = conn.execute("SELECT id, auth_source FROM users WHERE username = ?", (username,)).fetchone()
     if row:
+        if (row['auth_source'] or 'local') == 'local':
+            conn.close()
+            print(f"[SSO] '{username}' collides with a local account, refusing SSO mapping")
+            return None
         user_id = row['id']
     else:
         cur = conn.cursor()
-        cur.execute("INSERT INTO users (username, password, email, is_admin, status) VALUES (?, '', ?, 0, 1)",
+        cur.execute("INSERT INTO users (username, password, email, is_admin, status, auth_source) VALUES (?, '', ?, 0, 1, 'ldap')",
                     (username, email))
         user_id = cur.lastrowid
         conn.commit()
@@ -1125,6 +1132,7 @@ USERS_HTML = r'''
                         <th scope="col">Username</th>
                         <th scope="col">Email</th>
                         <th scope="col">Role</th>
+                        <th scope="col">Source</th>
                         <th scope="col">Status</th>
                         <th scope="col">Created</th>
                         <th scope="col">Actions</th>
@@ -1144,6 +1152,13 @@ USERS_HTML = r'''
                             <span class="badge badge-primary text-xs font-semibold">Admin</span>
                             {% else %}
                             <span class="badge badge-ghost text-xs font-semibold">User</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.auth_source == 'ldap' %}
+                            <span class="badge badge-outline badge-info text-xs font-semibold">Domain</span>
+                            {% else %}
+                            <span class="badge badge-outline text-xs font-semibold">Local</span>
                             {% endif %}
                         </td>
                         <td>
@@ -1555,12 +1570,8 @@ SETTINGS_HTML = r'''
                     <button type="submit" class="btn btn-primary" data-loading-text="Saving…">
                         <i data-lucide="save" class="w-4 h-4 mr-1" aria-hidden="true"></i>Save Configuration
                     </button>
-                    {% if ldap_config.get('enabled') %}
-                    <button type="button" class="btn btn-outline btn-secondary" onclick="syncLdapUsers()">
-                        <i data-lucide="refresh-cw" class="w-4 h-4 mr-1" aria-hidden="true"></i>Sync Users Now
-                    </button>
-                    {% endif %}
                 </div>
+                <p class="text-sm text-base-content/70 mt-3">Domain users appear in the Users list automatically on their first sign-in; admin rights follow LDAP group membership on every sign-in.</p>
             </form>
         </div>
     </div>
@@ -1569,40 +1580,6 @@ SETTINGS_HTML = r'''
 
 {% block scripts %}
 <script>
-function syncLdapUsers() {
-    const btn = event.currentTarget;
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading loading-spinner loading-xs mr-1"></span>Syncing…';
-    
-    const resultDiv = document.getElementById('ldapTestResult');
-    resultDiv.classList.add('hidden');
-    
-    fetch('/api/ldap/sync', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-            
-            resultDiv.classList.remove('hidden', 'alert-success', 'alert-error');
-            if (data.success) {
-                resultDiv.classList.add('alert-success');
-                resultDiv.innerText = data.message;
-                setTimeout(() => window.location.reload(), 2000);
-            } else {
-                resultDiv.classList.add('alert-error');
-                resultDiv.innerText = data.error || 'Sync failed';
-            }
-        })
-        .catch(error => {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-            resultDiv.classList.remove('hidden', 'alert-success');
-            resultDiv.classList.add('alert-error');
-            resultDiv.innerText = 'Error: ' + error;
-        });
-}
-
 function testLdap() {
     const server = document.getElementById('ldapServer').value;
     const user = document.getElementById('ldapUser').value;
@@ -1963,11 +1940,13 @@ def web_login():
             else:
                 print(f"[LOGIN] LDAP auth FAILED for: {username}")
         
-        # If LDAP failed or disabled, try local authentication
+        # If LDAP failed or disabled, try local authentication.
+        # Domain-managed rows (auth_source='ldap') have no usable local password.
         if not user:
             print(f"[LOGIN] Trying local authentication for: {username}")
-            local_user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-            
+            local_user = conn.execute("SELECT * FROM users WHERE username = ? AND COALESCE(auth_source, 'local') = 'local'",
+                                      (username,)).fetchone()
+
             if local_user:
                 print(f"[LOGIN] Found local user: {username}, checking password…")
                 if verify_password(password, local_user['password']) and local_user['status'] == 1:
@@ -2008,8 +1987,8 @@ def web_login_sso():
         print(f"[SSO] browser validation failed: {e}")
         return redirect(url_for('web_login'))
     u = resolve_sso_user(principal)
-    if not u['is_admin']:
-        print(f"[SSO] browser login denied (not admin): {u['username']}")
+    if not u or not u['is_admin']:
+        print(f"[SSO] browser login denied for principal: {principal}")
         return redirect(url_for('web_login'))
     session['user_id'] = u['user_id']
     session['username'] = u['username']
@@ -2432,6 +2411,8 @@ def api_login_sso():
         resp.headers['WWW-Authenticate'] = 'Negotiate'
         return resp
     u = resolve_sso_user(principal)
+    if not u:
+        return jsonify({'error': 'SSO principal collides with a local account'}), 403
     access_token = create_token(u['user_id'], u['username'], u['is_admin'])
     print(f"[SSO] client login OK: {u['username']} (admin={u['is_admin']})")
     return jsonify({
@@ -2473,9 +2454,11 @@ def api_login():
             if user_id:
                 user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
                 
-    # Fallback to local authentication
+    # Fallback to local authentication (local rows only — domain-managed rows
+    # have no usable local password)
     if not user:
-        local_user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        local_user = conn.execute("SELECT * FROM users WHERE username = ? AND COALESCE(auth_source, 'local') = 'local'",
+                                  (username,)).fetchone()
         if local_user and verify_password(password, local_user['password']):
             maybe_upgrade_password(conn, local_user, password)
             user = local_user
@@ -2879,7 +2862,6 @@ def api_peers():
 
 # Initialize DB on module load (for Gunicorn)
 init_db()
-start_ldap_sync_scheduler()
 
 
 def get_id_server():
@@ -2999,19 +2981,6 @@ def web_unclaim_device(device_id):
         print(f"[MY DEVICES] Unclaimed device: {device_id} for user {session['username']}")
     conn.close()
     return redirect(url_for('web_my_devices'))
-
-@app.route('/api/ldap/sync', methods=['POST'])
-@admin_required
-def api_ldap_sync():
-    """Manual trigger to synchronize LDAP/AD users to local database"""
-    if not LDAP_AVAILABLE:
-        return jsonify({"error": "LDAP module not available"}), 400
-        
-    success, message = sync_all_ldap_users()
-    if success:
-        return jsonify({"success": True, "message": message})
-    else:
-        return jsonify({"success": False, "error": message}), 500
 
 if __name__ == '__main__':
     
