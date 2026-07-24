@@ -408,19 +408,27 @@ BASE_HTML = r'''
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - RustDesk Panel</title>
+    <script>
+      // Set data-theme before the stylesheet paints so switching themes
+      // doesn't flash the other theme on every navigation (was previously
+      // only applied from a <script> at the end of <body>).
+      document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'corporate');
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="/static/output.css" rel="stylesheet">
     <style>
-      body{font-family:'Open Sans',system-ui,-apple-system,sans-serif}
-      h1,h2,h3,.card-title,.stat-value,.navbar-brand,.brand{font-family:'Poppins',system-ui,sans-serif}
-      .card-title{font-size:1.125rem;line-height:1.4}
+      body{font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif}
+      .card-title{font-size:1.125rem;line-height:1.4;font-weight:600}
     </style>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@1.26.0"></script>
 </head>
 <body class="min-h-screen bg-base-200">
     <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 btn btn-primary btn-sm">Skip to content</a>
+    <!-- Global toast stack. aria-live=polite so screen readers announce
+         transient messages; individual toasts auto-dismiss (see showToast). -->
+    <div id="toastStack" class="toast toast-top toast-end z-[100]" aria-live="polite" aria-atomic="false"></div>
     <div class="drawer lg:drawer-open">
         <input id="sidebar-drawer" type="checkbox" class="drawer-toggle" />
         
@@ -433,7 +441,7 @@ BASE_HTML = r'''
                     </label>
                 </div>
                 <div class="flex-grow">
-                    <span class="text-sm text-base-content/70 tabular-nums">{{ current_time }}</span>
+                    <span id="liveClock" class="text-sm text-base-content/70 tabular-nums font-mono" title="Your local time">{{ current_time }}</span>
                 </div>
                 <div class="flex-none gap-2">
                     <!-- Theme Toggle -->
@@ -460,7 +468,7 @@ BASE_HTML = r'''
             </header>
 
             <!-- Content Area -->
-            <main id="main" class="p-6 flex-grow bg-base-200">
+            <main id="main" class="p-6 flex-grow bg-base-200 motion-safe:rise-in">
                 {% block content %}{% endblock %}
             </main>
         </div>
@@ -468,7 +476,7 @@ BASE_HTML = r'''
         <!-- Sidebar -->
         <div class="drawer-side z-20">
             <label for="sidebar-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
-            <div class="p-4 w-80 min-h-full bg-base-100 border-r border-base-300 text-base-content flex flex-col">
+            <div class="p-4 w-64 min-h-full bg-base-100 border-r border-base-300 text-base-content flex flex-col">
                 <!-- Brand -->
                 <div class="px-4 py-3 border-b border-base-300 mb-4">
                     <a href="/" class="flex items-center gap-2 text-xl font-bold text-base-content no-underline">
@@ -480,38 +488,38 @@ BASE_HTML = r'''
                 <nav aria-label="Primary" class="flex-grow">
                 <ul class="menu menu-vertical p-0 gap-1">
                     <li>
-                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'dashboard' else '' }}" href="{{ url_for('web_dashboard') }}">
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'dashboard' else '' }}" href="{{ url_for('web_dashboard') }}" aria-current="{{ 'page' if active_page == 'dashboard' else 'false' }}">
                             <i data-lucide="layout-dashboard" class="w-5 h-5" aria-hidden="true"></i>
                             Dashboard
                         </a>
                     </li>
                     <li>
-                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'my_devices' else '' }}" href="{{ url_for('web_my_devices') }}">
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'my_devices' else '' }}" href="{{ url_for('web_my_devices') }}" aria-current="{{ 'page' if active_page == 'my_devices' else 'false' }}">
                             <i data-lucide="monitor" class="w-5 h-5" aria-hidden="true"></i>
                             My Devices
                         </a>
                     </li>
                     {% if session.is_admin %}
                     <li>
-                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'devices' else '' }}" href="{{ url_for('web_devices') }}">
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'devices' else '' }}" href="{{ url_for('web_devices') }}" aria-current="{{ 'page' if active_page == 'devices' else 'false' }}">
                             <i data-lucide="shield" class="w-5 h-5" aria-hidden="true"></i>
                             All Devices
                         </a>
                     </li>
                     <li>
-                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'users' else '' }}" href="{{ url_for('web_users') }}">
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'users' else '' }}" href="{{ url_for('web_users') }}" aria-current="{{ 'page' if active_page == 'users' else 'false' }}">
                             <i data-lucide="users" class="w-5 h-5" aria-hidden="true"></i>
                             Users
                         </a>
                     </li>
                     <li>
-                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'logs' else '' }}" href="{{ url_for('web_logs') }}">
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'logs' else '' }}" href="{{ url_for('web_logs') }}" aria-current="{{ 'page' if active_page == 'logs' else 'false' }}">
                             <i data-lucide="clipboard-list" class="w-5 h-5" aria-hidden="true"></i>
                             Logs
                         </a>
                     </li>
                     <li>
-                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'settings' else '' }}" href="{{ url_for('web_settings') }}">
+                        <a class="{{ 'active bg-primary text-primary-content font-semibold' if active_page == 'settings' else '' }}" href="{{ url_for('web_settings') }}" aria-current="{{ 'page' if active_page == 'settings' else 'false' }}">
                             <i data-lucide="settings" class="w-5 h-5" aria-hidden="true"></i>
                             Settings
                         </a>
@@ -529,7 +537,7 @@ BASE_HTML = r'''
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
     <script>
         // Shared DataTables -> DaisyUI styling helper (P3).
         // Wraps DataTables init so the injected filter box, length menu, info
@@ -626,16 +634,97 @@ BASE_HTML = r'''
             }
         }
 
-        // Init theme from localStorage
-        const savedTheme = localStorage.getItem('theme') || 'corporate';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        
+        // Transient toast notification (auto-dismisses in 3.5s). type ∈
+        // success|error|warning|info. Replaces scattered window.alert() calls
+        // with a themed, non-blocking, theme-aware surface.
+        window.showToast = function(message, type) {
+            type = type || 'info';
+            const stack = document.getElementById('toastStack');
+            if (!stack) { return; }
+            const icons = { success: 'check-circle-2', error: 'alert-circle', warning: 'triangle-alert', info: 'info' };
+            const el = document.createElement('div');
+            el.className = 'toast-item alert alert-' + type + ' shadow-lg max-w-sm';
+            el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+            el.innerHTML = '<i data-lucide="' + (icons[type] || 'info') + '" class="w-5 h-5 shrink-0" aria-hidden="true"></i><span class="text-sm">' + String(message).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</span>';
+            stack.appendChild(el);
+            if (window.lucide) { lucide.createIcons(); }
+            setTimeout(() => {
+                el.style.transition = 'opacity 0.3s';
+                el.style.opacity = '0';
+                setTimeout(() => el.remove(), 300);
+            }, 3500);
+        };
+
+        // Header clock — client-rendered so it actually ticks (the old
+        // server-rendered timestamp never updated after page load).
+        function tickClock() {
+            const el = document.getElementById('liveClock');
+            if (el) {
+                el.textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+            }
+        }
+
+        // Themed replacement for window.confirm() — native confirm() ignores
+        // the corporate/business theme and looks inconsistent with the
+        // app's own <dialog> modals. Usage: confirmDialog('Delete X?', () =>
+        // doTheThing()). Builds one reusable <dialog> lazily on first call.
+        window.confirmDialog = function(message, onConfirm, opts) {
+            opts = opts || {};
+            let dlg = document.getElementById('sharedConfirmDialog');
+            if (!dlg) {
+                dlg = document.createElement('dialog');
+                dlg.id = 'sharedConfirmDialog';
+                dlg.className = 'modal';
+                dlg.innerHTML = `
+                    <div class="modal-box max-w-sm">
+                        <div class="flex items-start gap-3">
+                            <div class="w-10 h-10 rounded-full bg-error/10 text-error flex items-center justify-center shrink-0">
+                                <i data-lucide="triangle-alert" class="w-5 h-5" aria-hidden="true"></i>
+                            </div>
+                            <p id="sharedConfirmMessage" class="text-sm pt-2"></p>
+                        </div>
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button type="button" class="btn btn-ghost btn-sm" id="sharedConfirmCancel">Cancel</button>
+                            <button type="button" class="btn btn-error btn-sm" id="sharedConfirmOk">Confirm</button>
+                        </div>
+                    </div>
+                    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+                `;
+                document.body.appendChild(dlg);
+            }
+            dlg.querySelector('#sharedConfirmMessage').textContent = message;
+            const okBtn = dlg.querySelector('#sharedConfirmOk');
+            okBtn.textContent = opts.confirmLabel || 'Confirm';
+            const cancelBtn = dlg.querySelector('#sharedConfirmCancel');
+            const cleanup = () => { okBtn.replaceWith(okBtn.cloneNode(true)); };
+            dlg.showModal();
+            if (window.lucide) { lucide.createIcons(); }
+            dlg.querySelector('#sharedConfirmOk').addEventListener('click', function() {
+                dlg.close();
+                cleanup();
+                onConfirm();
+            }, { once: true });
+            cancelBtn.onclick = () => dlg.close();
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
             updateThemeIcon();
+            tickClock();
+            setInterval(tickClock, 1000);
             if (window.lucide) {
                 lucide.createIcons();
             }
-            
+
+            // Flash toast that survives a page reload (set before location.reload()).
+            try {
+                const flash = sessionStorage.getItem('flashToast');
+                if (flash) {
+                    sessionStorage.removeItem('flashToast');
+                    const { m, t } = JSON.parse(flash);
+                    window.showToast(m, t || 'info');
+                }
+            } catch (e) { /* ignore */ }
+
             // Handle form submission loading states
             document.addEventListener('submit', (e) => {
                 const form = e.target;
@@ -661,19 +750,26 @@ LOGIN_HTML = r'''
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - RustDesk Panel</title>
+    <script>
+      document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'corporate');
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="/static/output.css" rel="stylesheet">
     <style>
-      body{font-family:'Open Sans',system-ui,-apple-system,sans-serif}
-      h1,h2,h3,.card-title,.stat-value,.navbar-brand,.brand{font-family:'Poppins',system-ui,sans-serif}
-      .card-title{font-size:1.125rem;line-height:1.4}
+      body{font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif}
+      .card-title{font-size:1.125rem;line-height:1.4;font-weight:600}
+      .login-backdrop{
+        background:
+          radial-gradient(ellipse 80% 60% at 50% -10%, oklch(var(--p) / 0.16), transparent),
+          radial-gradient(ellipse 60% 50% at 100% 100%, oklch(var(--in) / 0.08), transparent);
+      }
     </style>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@1.26.0"></script>
 </head>
-<body class="min-h-screen bg-base-200 flex items-center justify-center">
-    <div class="card w-96 bg-base-100 shadow-xl border border-base-300">
+<body class="min-h-screen bg-base-200 login-backdrop flex items-center justify-center p-4">
+    <div class="card w-full max-w-sm bg-base-100 shadow-xl border border-base-300">
         <div class="card-body p-8">
             <div class="flex flex-col items-center mb-6">
                 <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
@@ -682,14 +778,14 @@ LOGIN_HTML = r'''
                 <h1 class="card-title text-2xl font-bold text-base-content text-balance">RustDesk Panel</h1>
                 <p class="text-sm text-base-content/60">Sign in to your account</p>
             </div>
-            
+
             {% if error %}
             <div class="alert alert-error shadow-sm mb-4" aria-live="polite">
                 <i data-lucide="alert-circle" class="w-5 h-5" aria-hidden="true"></i>
                 <span class="text-sm font-semibold">{{ error }}</span>
             </div>
             {% endif %}
-            
+
             <form method="POST" class="space-y-4">
                 <div class="form-control w-full">
                     <label class="label" for="login-username"><span class="label-text font-semibold">Username</span></label>
@@ -698,15 +794,21 @@ LOGIN_HTML = r'''
                         <input type="text" id="login-username" class="grow" name="username" placeholder="Username… e.g. admin" required autocomplete="username" spellcheck="false" autofocus />
                     </label>
                 </div>
-                
+
                 <div class="form-control w-full">
                     <label class="label" for="login-password"><span class="label-text font-semibold">Password</span></label>
                     <label class="input input-bordered flex items-center gap-2">
                         <i data-lucide="lock" class="w-4 h-4 opacity-50" aria-hidden="true"></i>
                         <input type="password" id="login-password" class="grow" name="password" placeholder="Password…" required autocomplete="current-password" spellcheck="false" />
+                        <button type="button" class="btn btn-ghost btn-xs btn-square" id="toggleLoginPassword" aria-label="Show password">
+                            <i data-lucide="eye" id="toggleLoginPasswordIcon" class="w-4 h-4 opacity-50" aria-hidden="true"></i>
+                        </button>
                     </label>
+                    <span id="capsLockHint" class="hidden label-text-alt text-warning mt-1 flex items-center gap-1" aria-live="polite">
+                        <i data-lucide="triangle-alert" class="w-3.5 h-3.5" aria-hidden="true"></i>Caps Lock is on
+                    </span>
                 </div>
-                
+
                 <div class="card-actions justify-end mt-6">
                     <button type="submit" class="btn btn-primary w-full">
                         <i data-lucide="log-in" class="w-4 h-4" aria-hidden="true"></i> Sign In
@@ -716,14 +818,11 @@ LOGIN_HTML = r'''
         </div>
     </div>
     <script>
-        // Init theme
-        const savedTheme = localStorage.getItem('theme') || 'corporate';
-        document.documentElement.setAttribute('data-theme', savedTheme);
         document.addEventListener('DOMContentLoaded', () => {
             if (window.lucide) {
                 lucide.createIcons();
             }
-            
+
             // Handle login form submission loading states
             const form = document.querySelector('form');
             if (form) {
@@ -735,6 +834,32 @@ LOGIN_HTML = r'''
                     }
                 });
             }
+
+            const toggleBtn = document.getElementById('toggleLoginPassword');
+            const pwInput = document.getElementById('login-password');
+            if (toggleBtn && pwInput) {
+                toggleBtn.addEventListener('click', () => {
+                    const showing = pwInput.type === 'text';
+                    pwInput.type = showing ? 'password' : 'text';
+                    toggleBtn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+                    document.getElementById('toggleLoginPasswordIcon').setAttribute('data-lucide', showing ? 'eye' : 'eye-off');
+                    if (window.lucide) { lucide.createIcons(); }
+                });
+            }
+
+            // Caps Lock warning on the password field — a classic silent
+            // cause of "wrong password" frustration.
+            const capsHint = document.getElementById('capsLockHint');
+            if (pwInput && capsHint) {
+                const checkCaps = (e) => {
+                    if (e.getModifierState) {
+                        capsHint.classList.toggle('hidden', !e.getModifierState('CapsLock'));
+                    }
+                };
+                pwInput.addEventListener('keydown', checkCaps);
+                pwInput.addEventListener('keyup', checkCaps);
+                pwInput.addEventListener('blur', () => capsHint.classList.add('hidden'));
+            }
         });
     </script>
 </body>
@@ -744,10 +869,18 @@ LOGIN_HTML = r'''
 DASHBOARD_HTML = r'''
 {% extends "base" %}
 {% block content %}
-<h1 class="text-2xl font-bold text-base-content text-balance mb-6">Dashboard</h1>
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <h1 class="text-2xl font-bold text-base-content text-balance">Dashboard</h1>
+    <div class="flex items-center gap-2 text-sm text-base-content/70" aria-live="polite">
+        <span id="liveDot" class="live-dot is-live" aria-hidden="true"></span>
+        <span id="liveStatus">Live</span>
+        <span class="text-base-content/40">·</span>
+        <span>updated <span id="lastUpdated" class="tabular-nums font-mono">just now</span></span>
+    </div>
+</div>
 
 <!-- Stats -->
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="stats shadow-sm bg-base-100 border border-base-300 p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-primary">
@@ -756,13 +889,13 @@ DASHBOARD_HTML = r'''
                 </div>
             </div>
             <div>
-                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.total }}</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums" data-kpi="total" aria-live="polite">{{ stats.total }}</div>
                 <div class="stat-title text-sm text-base-content/70">Total Devices</div>
             </div>
         </div>
     </div>
-    
-    <div class="stats shadow-sm bg-base-100 border border-base-300 p-2">
+
+    <div class="stats shadow-sm bg-base-100 border border-base-300 border-l-4 border-l-success p-2">
         <div class="stat flex items-center gap-4">
             <div class="stat-figure text-success">
                 <div class="w-12 h-12 bg-success/10 text-success rounded-lg flex items-center justify-center">
@@ -770,7 +903,7 @@ DASHBOARD_HTML = r'''
                 </div>
             </div>
             <div>
-                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.online }}</div>
+                <div class="stat-value text-3xl font-bold text-success mb-1 tabular-nums" data-kpi="online" aria-live="polite">{{ stats.online }}</div>
                 <div class="stat-title text-sm text-base-content/70">Online Now</div>
             </div>
         </div>
@@ -784,7 +917,7 @@ DASHBOARD_HTML = r'''
                 </div>
             </div>
             <div>
-                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.connections_today }}</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums" data-kpi="connections_today" aria-live="polite">{{ stats.connections_today }}</div>
                 <div class="stat-title text-sm text-base-content/70">Connections Today</div>
             </div>
         </div>
@@ -798,7 +931,7 @@ DASHBOARD_HTML = r'''
                 </div>
             </div>
             <div>
-                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums">{{ stats.users }}</div>
+                <div class="stat-value text-3xl font-bold text-base-content mb-1 tabular-nums" data-kpi="users" aria-live="polite">{{ stats.users }}</div>
                 <div class="stat-title text-sm text-base-content/70">Users</div>
             </div>
         </div>
@@ -810,17 +943,49 @@ DASHBOARD_HTML = r'''
     <div class="lg:col-span-2 card bg-base-100 border border-base-300 shadow-sm">
         <div class="card-body p-5">
             <h2 class="card-title text-base font-semibold text-balance">Connections (Last 7&nbsp;Days)</h2>
+            {% if chart_data and chart_data|sum > 0 %}
             <div class="relative h-72">
-                <canvas id="connectionsChart" role="img" aria-label="Connections over the last 7 days"></canvas>
+                <canvas id="connectionsChart" role="img" aria-label="Connections per day over the last 7 days: {% for i in range(chart_labels|length) %}{{ chart_labels[i] }}: {{ chart_data[i] }}{{ ', ' if not loop.last }}{% endfor %}"></canvas>
             </div>
+            <table class="sr-only">
+                <caption>Connections per day, last 7 days</caption>
+                <thead><tr><th scope="col">Date</th><th scope="col">Connections</th></tr></thead>
+                <tbody>
+                    {% for i in range(chart_labels|length) %}
+                    <tr><td>{{ chart_labels[i] }}</td><td>{{ chart_data[i] }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="h-72 flex flex-col items-center justify-center text-center">
+                <i data-lucide="line-chart" class="w-10 h-10 opacity-30 mb-2" aria-hidden="true"></i>
+                <p class="text-sm text-base-content/60">No connections in the last 7 days</p>
+            </div>
+            {% endif %}
         </div>
     </div>
     <div class="card bg-base-100 border border-base-300 shadow-sm">
         <div class="card-body p-5">
             <h2 class="card-title text-base font-semibold text-balance">OS Distribution</h2>
+            {% if os_data and os_data|sum > 0 %}
             <div class="relative h-72">
-                <canvas id="osChart" role="img" aria-label="Operating-system distribution"></canvas>
+                <canvas id="osChart" role="img" aria-label="Operating system distribution: {% for i in range(os_labels|length) %}{{ os_labels[i] }}: {{ os_data[i] }}{{ ', ' if not loop.last }}{% endfor %}"></canvas>
             </div>
+            <table class="sr-only">
+                <caption>Devices by operating system</caption>
+                <thead><tr><th scope="col">OS</th><th scope="col">Devices</th></tr></thead>
+                <tbody>
+                    {% for i in range(os_labels|length) %}
+                    <tr><td>{{ os_labels[i] }}</td><td>{{ os_data[i] }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="h-72 flex flex-col items-center justify-center text-center">
+                <i data-lucide="pie-chart" class="w-10 h-10 opacity-30 mb-2" aria-hidden="true"></i>
+                <p class="text-sm text-base-content/60">No devices yet</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -839,23 +1004,23 @@ DASHBOARD_HTML = r'''
                     <tr>
                         <th scope="col">ID</th>
                         <th scope="col">Hostname</th>
-                        <th scope="col">User</th>
-                        <th scope="col">OS</th>
-                        <th scope="col">IP</th>
+                        <th scope="col" class="hidden md:table-cell">User</th>
+                        <th scope="col" class="hidden md:table-cell">OS</th>
+                        <th scope="col" class="hidden md:table-cell">IP</th>
                         <th scope="col">Status</th>
-                        <th scope="col">Last Seen</th>
+                        <th scope="col" class="hidden md:table-cell">Last Seen</th>
                         <th scope="col">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for d in devices[:10] %}
                     <tr class="hover">
-                        <td><span class="font-mono font-semibold text-primary tabular-nums">{{ d.id }}</span></td>
+                        <td><span class="font-mono font-semibold text-base-content tabular-nums">{{ d.id }}</span></td>
                         <td>{{ d.hostname or '-' }}</td>
-                        <td>{{ d.username or '-' }}</td>
-                        <td>{{ d.os_short }}</td>
-                        <td><span class="tabular-nums">{{ d.ip or '-' }}</span></td>
-                        <td>
+                        <td class="hidden md:table-cell">{{ d.username or '-' }}</td>
+                        <td class="hidden md:table-cell">{{ d.os_short }}</td>
+                        <td class="hidden md:table-cell"><span class="font-mono tabular-nums">{{ d.ip or '-' }}</span></td>
+                        <td class="js-device-status" data-device-id="{{ d.id }}">
                             {% if d.online %}
                             <span class="badge badge-success gap-1 text-xs font-semibold">
                                 <span class="w-1.5 h-1.5 rounded-full bg-success-content motion-safe:animate-pulse"></span>
@@ -865,7 +1030,7 @@ DASHBOARD_HTML = r'''
                             <span class="badge badge-ghost text-xs font-semibold">Offline</span>
                             {% endif %}
                         </td>
-                        <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
+                        <td class="hidden md:table-cell"><span class="font-mono tabular-nums">{{ d.last_seen_str }}</span></td>
                         <td>
                             <button class="btn btn-primary btn-sm" onclick='connectTo({{ d.id | tojson }})' aria-label="Connect to device {{ d.id }}">
                                 <i data-lucide="link" class="w-4 h-4" aria-hidden="true"></i> Connect
@@ -899,64 +1064,156 @@ function connectTo(id) {
 // re-applies them, invoked by toggleTheme() after a switch.
 const chartColors = window.getChartThemeColors();
 
-// Connections Chart
-const connCtx = document.getElementById('connectionsChart').getContext('2d');
-const connectionsChart = new Chart(connCtx, {
-    type: 'line',
-    data: {
-        labels: {{ chart_labels | safe }},
-        datasets: [{
-            label: 'Connections',
-            data: {{ chart_data | safe }},
-            borderColor: chartColors.primary,
-            backgroundColor: chartColors.primaryFill,
-            fill: true,
-            tension: 0.4
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-            y: { beginAtZero: true, grid: { color: chartColors.grid }, ticks: { color: chartColors.text } },
-            x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text } }
+// Connections Chart — canvas is only rendered when there's data (see the
+// empty-state branch in the template above).
+const connCanvas = document.getElementById('connectionsChart');
+if (connCanvas) {
+    const connectionsChart = new Chart(connCanvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels | tojson }},
+            datasets: [{
+                label: 'Connections',
+                data: {{ chart_data | tojson }},
+                borderColor: chartColors.primary,
+                backgroundColor: chartColors.primaryFill,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: chartColors.grid }, ticks: { color: chartColors.text } },
+                x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text } }
+            }
         }
-    }
-});
-connectionsChart.__recolor = function(colors) {
-    this.data.datasets[0].borderColor = colors.primary;
-    this.data.datasets[0].backgroundColor = colors.primaryFill;
-    this.options.scales.y.grid.color = colors.grid;
-    this.options.scales.y.ticks.color = colors.text;
-    this.options.scales.x.grid.color = colors.grid;
-    this.options.scales.x.ticks.color = colors.text;
-};
+    });
+    connectionsChart.__recolor = function(colors) {
+        this.data.datasets[0].borderColor = colors.primary;
+        this.data.datasets[0].backgroundColor = colors.primaryFill;
+        this.options.scales.y.grid.color = colors.grid;
+        this.options.scales.y.ticks.color = colors.text;
+        this.options.scales.x.grid.color = colors.grid;
+        this.options.scales.x.ticks.color = colors.text;
+    };
+    window.__charts.push(connectionsChart);
+}
 
 // OS Chart
-const osCtx = document.getElementById('osChart').getContext('2d');
-const osChart = new Chart(osCtx, {
-    type: 'doughnut',
-    data: {
-        labels: {{ os_labels | safe }},
-        datasets: [{
-            data: {{ os_data | safe }},
-            backgroundColor: chartColors.palette
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { color: chartColors.text } } }
-    }
-});
-osChart.__recolor = function(colors) {
-    this.data.datasets[0].backgroundColor = colors.palette;
-    this.options.plugins.legend.labels.color = colors.text;
-};
+const osCanvas = document.getElementById('osChart');
+if (osCanvas) {
+    const osChart = new Chart(osCanvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: {{ os_labels | tojson }},
+            datasets: [{
+                data: {{ os_data | tojson }},
+                backgroundColor: chartColors.palette
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { color: chartColors.text } } }
+        }
+    });
+    osChart.__recolor = function(colors) {
+        this.data.datasets[0].backgroundColor = colors.palette;
+        this.options.plugins.legend.labels.color = colors.text;
+    };
+    window.__charts.push(osChart);
+}
 
-// Register both charts for in-place theme re-coloring.
-window.__charts.push(connectionsChart, osChart);
+// ============ Live polling ============
+// Refresh KPIs, chart series and device online/offline in place every 20s so
+// the "monitoring" dashboard actually stays current without a full reload.
+// Pauses while the tab is hidden (saves the server pointless queries) and
+// resumes — refreshing immediately — when it becomes visible again. On a
+// fetch failure the live indicator flips to a muted "Reconnecting…" state
+// instead of silently going stale.
+(function() {
+    const REFRESH_MS = 20000;
+    let timer = null;
+    let lastOkTs = Date.now();
+
+    const dot = document.getElementById('liveDot');
+    const statusEl = document.getElementById('liveStatus');
+    const updatedEl = document.getElementById('lastUpdated');
+
+    function setLive(isLive) {
+        if (!dot || !statusEl) { return; }
+        dot.classList.toggle('is-live', isLive);
+        dot.style.background = isLive ? 'oklch(var(--su))' : 'oklch(var(--wa))';
+        statusEl.textContent = isLive ? 'Live' : 'Reconnecting…';
+    }
+
+    function renderUpdated() {
+        if (!updatedEl) { return; }
+        const secs = Math.round((Date.now() - lastOkTs) / 1000);
+        updatedEl.textContent = secs < 5 ? 'just now' : (secs < 60 ? secs + 's ago' : Math.floor(secs / 60) + 'm ago');
+    }
+    setInterval(renderUpdated, 5000);
+
+    function findChart(canvasId) {
+        const c = document.getElementById(canvasId);
+        if (!c) { return null; }
+        return (window.__charts || []).find(ch => ch.canvas === c) || null;
+    }
+
+    function applyData(data) {
+        // KPIs
+        document.querySelectorAll('[data-kpi]').forEach(el => {
+            const v = data.stats[el.dataset.kpi];
+            if (v != null && el.textContent !== String(v)) { el.textContent = v; }
+        });
+        // Connections line chart
+        const line = findChart('connectionsChart');
+        if (line) {
+            line.data.labels = data.chart_labels;
+            line.data.datasets[0].data = data.chart_data;
+            line.update('none');
+        }
+        // OS doughnut
+        const os = findChart('osChart');
+        if (os) {
+            os.data.labels = data.os_labels;
+            os.data.datasets[0].data = data.os_data;
+            os.update('none');
+        }
+        // Device online/offline badges
+        const onlineBadge = '<span class="badge badge-success gap-1 text-xs font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-success-content motion-safe:animate-pulse"></span>Online</span>';
+        const offlineBadge = '<span class="badge badge-ghost text-xs font-semibold">Offline</span>';
+        document.querySelectorAll('.js-device-status').forEach(cell => {
+            const isOnline = !!(data.device_online && data.device_online[cell.dataset.deviceId]);
+            const want = isOnline ? onlineBadge : offlineBadge;
+            if (cell.innerHTML.trim() !== want) { cell.innerHTML = want; }
+        });
+    }
+
+    function refresh() {
+        fetch('/api/dashboard/stats', { headers: { 'Accept': 'application/json' } })
+            .then(r => { if (!r.ok) { throw new Error(r.status); } return r.json(); })
+            .then(data => {
+                applyData(data);
+                lastOkTs = Date.now();
+                renderUpdated();
+                setLive(true);
+            })
+            .catch(() => setLive(false));
+    }
+
+    function start() { if (!timer) { timer = setInterval(refresh, REFRESH_MS); } }
+    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) { stop(); }
+        else { refresh(); start(); }
+    });
+    start();
+})();
 </script>
 {% endblock %}
 '''
@@ -992,26 +1249,28 @@ DEVICES_HTML = r'''
                 <tbody>
                     {% for d in devices %}
                     <tr class="hover">
-                        <td><span class="font-mono font-semibold text-primary tabular-nums">{{ d.id }}</span></td>
+                        <td><span class="font-mono font-semibold text-base-content tabular-nums">{{ d.id }}</span></td>
                         <td>{{ d.hostname or '-' }}</td>
                         <td>{{ d.username or '-' }}</td>
                         <td>{{ d.os_short }}</td>
-                        <td><span class="tabular-nums">{{ d.ip or '-' }}</span></td>
-                        <td><span class="tabular-nums">{{ d.version or '-' }}</span></td>
+                        <td><span class="font-mono tabular-nums">{{ d.ip or '-' }}</span></td>
+                        <td><span class="font-mono tabular-nums">{{ d.version or '-' }}</span></td>
                         <td>
                             {% if d.online %}
                             <span class="badge badge-success gap-1 text-xs font-semibold">
                                 <span class="w-1.5 h-1.5 rounded-full bg-success-content motion-safe:animate-pulse"></span>
                                 Online
                             </span>
+                            {% elif not d.last_seen_iso %}
+                            <span class="badge badge-outline text-xs font-semibold" title="This device has registered but never reported its status">Never seen</span>
                             {% else %}
                             <span class="badge badge-ghost text-xs font-semibold">Offline</span>
                             {% endif %}
                         </td>
-                        <td><span class="tabular-nums">{{ d.last_seen_str }}</span></td>
+                        <td data-order="{{ d.last_seen_iso }}"><span class="font-mono tabular-nums">{{ d.last_seen_str }}</span></td>
                         <td class="flex gap-1">
-                            <button class="btn btn-primary btn-sm btn-square" onclick='connectTo({{ d.id | tojson }})' title="Connect" aria-label="Connect to device {{ d.id }}">
-                                <i data-lucide="link" class="w-4 h-4" aria-hidden="true"></i>
+                            <button class="btn btn-primary btn-sm" onclick='connectTo({{ d.id | tojson }})' aria-label="Connect to device {{ d.id }}">
+                                <i data-lucide="link" class="w-4 h-4 mr-1" aria-hidden="true"></i>Connect
                             </button>
                             <button class="btn btn-outline btn-sm btn-square" onclick='showDetails({{ d.id | tojson }})' title="Details" aria-label="View details for device {{ d.id }}">
                                 <i data-lucide="info" class="w-4 h-4" aria-hidden="true"></i>
@@ -1085,15 +1344,15 @@ function showDetails(id) {
         <div class="overflow-x-auto">
             <table class="table table-compact w-full text-sm">
                 <tbody>
-                    <tr class="border-b border-base-200"><th class="w-24 text-base-content/70">ID</th><td><code class="font-mono font-semibold text-primary tabular-nums">${esc(d.id)}</code></td></tr>
+                    <tr class="border-b border-base-200"><th class="w-24 text-base-content/70">ID</th><td><code class="font-mono font-semibold text-base-content tabular-nums">${esc(d.id)}</code></td></tr>
                     <tr class="border-b border-base-200"><th class="text-base-content/70">Hostname</th><td>${esc(d.hostname) || '-'}</td></tr>
                     <tr class="border-b border-base-200"><th class="text-base-content/70">Username</th><td>${esc(d.username) || '-'}</td></tr>
                     <tr class="border-b border-base-200"><th class="text-base-content/70">OS</th><td>${esc(d.os) || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="text-base-content/70">IP</th><td><span class="tabular-nums">${esc(d.ip) || '-'}</span></td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">IP</th><td><span class="font-mono tabular-nums">${esc(d.ip) || '-'}</span></td></tr>
                     <tr class="border-b border-base-200"><th class="text-base-content/70">CPU</th><td>${esc(d.cpu) || '-'}</td></tr>
                     <tr class="border-b border-base-200"><th class="text-base-content/70">Memory</th><td>${esc(d.memory) || '-'}</td></tr>
-                    <tr class="border-b border-base-200"><th class="text-base-content/70">Version</th><td><span class="tabular-nums">${esc(d.version) || '-'}</span></td></tr>
-                    <tr><th class="text-base-content/70">Last Seen</th><td><span class="tabular-nums">${esc(d.last_seen_str)}</span></td></tr>
+                    <tr class="border-b border-base-200"><th class="text-base-content/70">Version</th><td><span class="font-mono tabular-nums">${esc(d.version) || '-'}</span></td></tr>
+                    <tr><th class="text-base-content/70">Last Seen</th><td><span class="font-mono tabular-nums">${esc(d.last_seen_str)}</span></td></tr>
                 </tbody>
             </table>
         </div>
@@ -1128,25 +1387,25 @@ USERS_HTML = r'''
             <table id="usersTable" class="table table-zebra w-full">
                 <thead>
                     <tr>
-                        <th scope="col">ID</th>
+                        <th scope="col" class="hidden md:table-cell">ID</th>
                         <th scope="col">Username</th>
-                        <th scope="col">Email</th>
+                        <th scope="col" class="hidden sm:table-cell">Email</th>
                         <th scope="col">Role</th>
                         <th scope="col">Source</th>
                         <th scope="col">Status</th>
-                        <th scope="col">Created</th>
+                        <th scope="col" class="hidden md:table-cell">Created</th>
                         <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for u in users %}
                     <tr class="hover">
-                        <td><span class="tabular-nums">{{ u.id }}</span></td>
+                        <td class="hidden md:table-cell"><span class="tabular-nums">{{ u.id }}</span></td>
                         <td class="font-medium flex items-center gap-2">
                             <i data-lucide="user" class="w-4 h-4 text-base-content/40" aria-hidden="true"></i>
                             {{ u.username }}
                         </td>
-                        <td>{{ u.email or '-' }}</td>
+                        <td class="hidden sm:table-cell">{{ u.email or '-' }}</td>
                         <td>
                             {% if u.is_admin %}
                             <span class="badge badge-primary text-xs font-semibold">Admin</span>
@@ -1165,12 +1424,12 @@ USERS_HTML = r'''
                             {% if u.status == 1 %}
                             <span class="badge badge-success text-xs font-semibold">Active</span>
                             {% else %}
-                            <span class="badge badge-ghost text-xs font-semibold">Disabled</span>
+                            <span class="badge badge-error text-xs font-semibold">Disabled</span>
                             {% endif %}
                         </td>
-                        <td><span class="text-sm text-base-content/70 tabular-nums">{{ u.created_at }}</span></td>
+                        <td class="hidden md:table-cell"><span class="text-sm text-base-content/70 tabular-nums">{{ u.created_at }}</span></td>
                         <td>
-                            <button class="btn btn-sm btn-ghost text-error {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick='deleteUser({{ u.id }}, {{ u.username | tojson }})' {{ 'disabled' if u.username == 'admin' else '' }} aria-label="Delete user {{ u.username }}">
+                            <button class="btn btn-sm btn-ghost text-error {{ 'btn-disabled opacity-50' if u.username == 'admin' else '' }}" onclick='deleteUser({{ u.id }}, {{ u.username | tojson }})' {{ 'disabled' if u.username == 'admin' else '' }} aria-label="Delete user {{ u.username }}" title="{{ 'The built-in admin account cannot be deleted' if u.username == 'admin' else 'Delete user' }}">
                                 <i data-lucide="trash-2" class="w-5 h-5" aria-hidden="true"></i>
                             </button>
                         </td>
@@ -1190,12 +1449,12 @@ USERS_HTML = r'''
 </div>
 
 <!-- Add User Modal -->
-<dialog id="addUserModal" class="modal">
+<dialog id="addUserModal" class="modal" aria-labelledby="addUserModalTitle">
     <div class="modal-box">
         <form method="dialog">
             <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close modal">✕</button>
         </form>
-        <h2 class="font-bold text-lg text-balance mb-4">Add User</h2>
+        <h2 id="addUserModalTitle" class="font-bold text-lg text-balance mb-4">Add User</h2>
         <form action="{{ url_for('web_add_user') }}" method="POST">
             <div class="form-control w-full mb-4">
                 <label class="label" for="add-username"><span class="label-text font-semibold">Username</span></label>
@@ -1236,10 +1495,15 @@ $(document).ready(function() {
 });
 
 function deleteUser(id, username) {
-    if (confirm(`Delete user “${username}”?`)) {
+    window.confirmDialog(`Delete user "${username}"? This cannot be undone.`, () => {
         fetch('/api/admin/users/' + id, { method: 'DELETE' })
-            .then(() => location.reload());
-    }
+            .then(res => {
+                if (!res.ok) { throw new Error('Server returned ' + res.status); }
+                sessionStorage.setItem('flashToast', JSON.stringify({ m: 'User "' + username + '" deleted', t: 'success' }));
+                location.reload();
+            })
+            .catch(err => window.showToast('Failed to delete user: ' + err.message, 'error'));
+    }, { confirmLabel: 'Delete' });
 }
 </script>
 {% endblock %}
@@ -1248,13 +1512,13 @@ function deleteUser(id, username) {
 LOGS_HTML = r'''
 {% extends "base" %}
 {% block content %}
-<div class="flex justify-between items-center mb-6">
+<div class="flex flex-wrap justify-between items-center gap-3 mb-6">
     <h1 class="text-2xl font-bold text-base-content text-balance">Audit Logs</h1>
     <div class="join">
-        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'all' else 'btn-outline' }}" onclick="location.href='?type=all'">All</button>
-        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'conn' else 'btn-outline' }}" onclick="location.href='?type=conn'">Connections</button>
-        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'file' else 'btn-outline' }}" onclick="location.href='?type=file'">Files</button>
-        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'alarm' else 'btn-outline' }}" onclick="location.href='?type=alarm'">Alarms</button>
+        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'all' else 'btn-outline' }}" aria-current="{{ 'true' if log_type == 'all' else 'false' }}" onclick="location.href='?type=all'">All</button>
+        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'conn' else 'btn-outline' }}" aria-current="{{ 'true' if log_type == 'conn' else 'false' }}" onclick="location.href='?type=conn'">Connections</button>
+        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'file' else 'btn-outline' }}" aria-current="{{ 'true' if log_type == 'file' else 'false' }}" onclick="location.href='?type=file'">Files</button>
+        <button class="btn join-item btn-sm {{ 'btn-primary text-primary-content' if log_type == 'alarm' else 'btn-outline' }}" aria-current="{{ 'true' if log_type == 'alarm' else 'false' }}" onclick="location.href='?type=alarm'">Alarms</button>
     </div>
 </div>
 
@@ -1284,7 +1548,7 @@ LOGS_HTML = r'''
                             {% elif log.type == 'alarm' %}
                             <span class="badge badge-error text-xs font-semibold">alarm</span>
                             {% else %}
-                            <span class="badge badge-ghost text-xs font-semibold">{{ log.type }}</span>
+                            <span class="badge badge-ghost text-xs font-semibold">{{ log.type|title if log.type else 'Unknown' }}</span>
                             {% endif %}
                         </td>
                         <td><code class="font-mono text-sm text-base-content/70 tabular-nums">{{ log.device_id or '-' }}</code></td>
@@ -1384,8 +1648,9 @@ SETTINGS_HTML = r'''
                 </h2>
                 
                 <form action="/settings/global" method="POST" id="globalSettingsForm">
-                    <h3 class="text-sm font-semibold text-base-content/70 mb-3">General Settings</h3>
-                    
+                    <fieldset class="border-0 p-0 m-0">
+                    <legend class="text-sm font-semibold text-base-content/70 mb-3 p-0">General Settings</legend>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div class="form-control w-full">
                             <label class="label" for="globalTheme">
@@ -1409,9 +1674,11 @@ SETTINGS_HTML = r'''
                             </select>
                         </div>
                     </div>
+                    </fieldset>
 
-                    <h3 class="text-sm font-semibold text-base-content/70 mb-3 border-t border-base-200 pt-4">Security Settings</h3>
-                    
+                    <fieldset class="border-0 p-0 m-0 border-t border-base-200 pt-4">
+                    <legend class="text-sm font-semibold text-base-content/70 mb-3 p-0">Security Settings</legend>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div class="form-control w-full">
                             <label class="label" for="globalApproveMode">
@@ -1507,10 +1774,13 @@ SETTINGS_HTML = r'''
                             </select>
                         </div>
                     </div>
-                    
-                    <button type="submit" class="btn btn-primary w-full">
-                        <i data-lucide="save" class="w-4 h-4 mr-1" aria-hidden="true"></i>Apply Global Settings
-                    </button>
+                    </fieldset>
+
+                    <div class="flex flex-wrap gap-3">
+                        <button type="submit" class="btn btn-primary" data-loading-text="Applying…">
+                            <i data-lucide="save" class="w-4 h-4 mr-1" aria-hidden="true"></i>Apply Global Settings
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -1518,52 +1788,58 @@ SETTINGS_HTML = r'''
     
     <div class="card bg-base-100 border border-base-300 shadow-sm">
         <div class="card-body p-6">
-            <div class="flex justify-between items-center border-b border-base-200 pb-3 mb-4">
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-base-200 pb-3 mb-4">
                 <h2 class="card-title text-base font-semibold text-balance"><i data-lucide="network" class="text-primary w-5 h-5 mr-2" aria-hidden="true"></i>LDAP / Active Directory</h2>
                 <button type="button" class="btn btn-outline btn-sm" onclick="testLdap()">
                     <i data-lucide="plug" class="w-4 h-4 mr-1" aria-hidden="true"></i>Auto-Discover & Test
                 </button>
             </div>
-            
+
             <div id="ldapTestResult" class="alert hidden mb-4 shadow-sm" aria-live="polite"></div>
-            
+
             <form action="{{ url_for('web_save_ldap') }}" method="POST" id="ldapForm">
 
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapServer"><span class="label-text font-semibold">AD Server Address</span></label>
-                    <input type="text" class="input input-bordered w-full" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100… e.g. ldap://dc.company.local" value="{{ ldap_config.get('server', '') }}" autocomplete="off" spellcheck="false" required>
+                    <input type="text" class="input input-bordered w-full font-mono text-sm" name="ldap_server" id="ldapServer" placeholder="ldap://192.168.1.100… e.g. ldap://dc.company.local" value="{{ ldap_config.get('server', '') }}" autocomplete="off" spellcheck="false" required>
                     <span class="label-text-alt text-base-content/70 mt-1 block">IP address or domain of the Domain Controller</span>
                 </div>
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapUser"><span class="label-text font-semibold">Service Account (Username)</span></label>
-                    <input type="text" class="input input-bordered w-full" name="ldap_bind_dn" id="ldapUser" placeholder="admin@domain.local… e.g. bind_user@company.local" value="{{ ldap_config.get('bind_dn', '') }}" autocomplete="off" spellcheck="false" required>
+                    <input type="text" class="input input-bordered w-full font-mono text-sm" name="ldap_bind_dn" id="ldapUser" placeholder="admin@domain.local… e.g. bind_user@company.local" value="{{ ldap_config.get('bind_dn', '') }}" autocomplete="off" spellcheck="false" required>
                     <span class="label-text-alt text-base-content/70 mt-1 block">UPN (user@domain.local) or traditional DOMAIN\user</span>
                 </div>
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapPass"><span class="label-text font-semibold">Password</span></label>
-                    <input type="password" class="input input-bordered w-full" name="ldap_bind_password" id="ldapPass" placeholder="Password…" autocomplete="new-password" spellcheck="false">
-                    <span class="label-text-alt text-base-content/70 mt-1 block">Only needed if changing existing configuration</span>
+                    <input type="password" class="input input-bordered w-full" name="ldap_bind_password" id="ldapPass" placeholder="Password…" autocomplete="off" spellcheck="false" data-has-saved="{{ 'true' if ldap_config.get('bind_password') else 'false' }}">
+                    <span class="label-text-alt text-base-content/70 mt-1 block">Only needed if changing existing configuration — leave blank to keep the saved password</span>
                 </div>
-                
+
                 <div class="form-control w-full mb-4">
                     <label class="label" for="ldapBaseDn"><span class="label-text font-semibold">Search Base DN</span></label>
                     <input type="text" class="input input-bordered w-full font-mono text-sm" name="ldap_base_dn" id="ldapBaseDn" placeholder="OU=Staff,DC=company,DC=local… (empty = auto-discover domain root)" value="{{ ldap_config.get('base_dn', '') }}" autocomplete="off" spellcheck="false">
                     <span class="label-text-alt text-base-content/70 mt-1 block">Users are searched only under this DN — point it at a specific OU to limit who can sign in. "Auto-Discover &amp; Test" fills in the domain root when left empty.</span>
                 </div>
-                
-                <div class="form-control w-full mb-4">
-                    <label class="label" for="ldapAdminGroups"><span class="label-text font-semibold">Admin LDAP Groups</span></label>
-                    <input type="text" class="input input-bordered w-full" name="ldap_admin_groups" id="ldapAdminGroups" placeholder="Domain Admins, Administrators, RustDesk Admins…" value="{{ ldap_config.get('admin_groups', '') }}" autocomplete="off" spellcheck="false">
-                    <span class="label-text-alt text-base-content/70 mt-1 block">Comma-separated list of LDAP groups that map to the local Administrator role (others map to standard User role)</span>
+
+                <div class="rounded-lg border border-warning/30 bg-warning/5 p-4 mb-6">
+                    <p class="text-xs font-semibold text-warning flex items-center gap-1.5 mb-3">
+                        <i data-lucide="triangle-alert" class="w-4 h-4" aria-hidden="true"></i>
+                        Misconfiguring these two fields can lock domain admins out of the panel
+                    </p>
+                    <div class="form-control w-full mb-4">
+                        <label class="label" for="ldapAdminGroups"><span class="label-text font-semibold">Admin LDAP Groups</span></label>
+                        <input type="text" class="input input-bordered w-full" name="ldap_admin_groups" id="ldapAdminGroups" placeholder="Domain Admins, Administrators, RustDesk Admins…" value="{{ ldap_config.get('admin_groups', '') }}" autocomplete="off" spellcheck="false">
+                        <span class="label-text-alt text-base-content/70 mt-1 block">Comma-separated list of LDAP groups that map to the local Administrator role (others map to standard User role)</span>
+                    </div>
+
+                    <div class="form-control w-full">
+                        <label class="label cursor-pointer justify-start gap-3" for="ldapEnabled">
+                            <input type="checkbox" class="checkbox checkbox-warning" name="ldap_enabled" id="ldapEnabled" {{ 'checked' if ldap_config.get('enabled') else '' }}>
+                            <span class="label-text font-semibold">Enable LDAP Authentication</span>
+                        </label>
+                    </div>
                 </div>
-                
-                <div class="form-control w-full mb-6">
-                    <label class="label cursor-pointer justify-start gap-3" for="ldapEnabled">
-                        <input type="checkbox" class="checkbox checkbox-primary" name="ldap_enabled" id="ldapEnabled" {{ 'checked' if ldap_config.get('enabled') else '' }}>
-                        <span class="label-text font-semibold">Enable LDAP Authentication</span>
-                    </label>
-                </div>
-                
+
                 <div class="flex flex-wrap gap-3">
                     <button type="submit" class="btn btn-primary" data-loading-text="Saving…">
                         <i data-lucide="save" class="w-4 h-4 mr-1" aria-hidden="true"></i>Save Configuration
@@ -1578,23 +1854,47 @@ SETTINGS_HTML = r'''
 
 {% block scripts %}
 <script>
+// Success toast after a settings save (server redirects here with ?saved=…).
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    const saved = params.get('saved');
+    if (saved) {
+        window.showToast(saved === 'ldap' ? 'LDAP configuration saved' : 'Global settings applied', 'success');
+        // Strip the query param so a refresh doesn't re-toast.
+        history.replaceState(null, '', window.location.pathname);
+    }
+});
+
+// Tracks whether a Test has succeeded since the LDAP form was last edited —
+// gates enabling LDAP without ever having verified the connection (issue: an
+// admin could previously type a config and hit Save with Enable checked
+// without testing, silently locking non-domain admins out).
+let ldapTestPassed = false;
+
 function testLdap() {
     const server = document.getElementById('ldapServer').value;
     const user = document.getElementById('ldapUser').value;
-    const pass = document.getElementById('ldapPass').value;
-    
-    if (!server) {
-        alert("Please enter the AD Server Address first");
+    const passInput = document.getElementById('ldapPass');
+    const pass = passInput.value;
+
+    if (!server || !user) {
+        window.showToast("Enter the AD Server Address and Service Account first", "warning");
         return;
     }
-    
+    if (!pass) {
+        window.showToast(passInput.dataset.hasSaved === 'true'
+            ? "Re-enter the service account password to test — this always verifies live, not against the saved password."
+            : "Enter the service account password first", "warning");
+        return;
+    }
+
     const resultDiv = document.getElementById('ldapTestResult');
     resultDiv.className = 'alert alert-info shadow-sm flex items-center gap-2';
     resultDiv.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin" aria-hidden="true"></i>Testing connection and discovering Base DN…';
     resultDiv.classList.remove('hidden');
     if (window.lucide) { lucide.createIcons(); }
-    
-    fetch('/api/ldap/test', { 
+
+    fetch('/api/ldap/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ server: server, username: user, password: pass })
@@ -1604,6 +1904,7 @@ function testLdap() {
             if (data.success) {
                 resultDiv.className = 'alert alert-success shadow-sm flex items-center gap-2';
                 resultDiv.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4" aria-hidden="true"></i>' + data.message;
+                ldapTestPassed = true;
                 // Fill the Base DN field only when the admin hasn't chosen one
                 // (never overwrite a manually configured OU)
                 const baseDnInput = document.getElementById('ldapBaseDn');
@@ -1626,22 +1927,47 @@ function testLdap() {
         });
 }
 
-// Warn before navigating with unsaved changes in LDAP Form
+// Warn before navigating away with unsaved changes, on EITHER settings form.
 let isFormDirty = false;
-const form = document.getElementById('ldapForm');
-if (form) {
-    const inputs = form.querySelectorAll('input:not([type="hidden"])');
-    inputs.forEach(input => {
-        input.addEventListener('input', () => { isFormDirty = true; });
-    });
-    window.addEventListener('beforeunload', (e) => {
-        if (isFormDirty) {
-            e.preventDefault();
-            e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        }
+[document.getElementById('ldapForm'), document.getElementById('globalSettingsForm')].forEach(form => {
+    if (!form) { return; }
+    form.querySelectorAll('input:not([type="hidden"]), select').forEach(input => {
+        input.addEventListener('input', () => {
+            isFormDirty = true;
+            if (form.id === 'ldapForm') { ldapTestPassed = false; }
+        });
+        input.addEventListener('change', () => {
+            isFormDirty = true;
+            if (form.id === 'ldapForm') { ldapTestPassed = false; }
+        });
     });
     form.addEventListener('submit', () => { isFormDirty = false; });
-}
+});
+window.addEventListener('beforeunload', (e) => {
+    if (isFormDirty) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+    }
+});
+
+// Gate: enabling LDAP without a successful Test this session risks locking
+// domain admins out with no warning if the config is wrong. Require explicit
+// acknowledgement in that case (never silently blocks the save).
+document.getElementById('ldapForm').addEventListener('submit', function(e) {
+    if (this.dataset.confirmed === 'true') { return; }
+    const enabling = document.getElementById('ldapEnabled').checked;
+    if (enabling && !ldapTestPassed) {
+        e.preventDefault();
+        e.stopPropagation(); // don't let the shared submit-spinner handler
+                              // (BASE_HTML, document-level) fire for a submit
+                              // we just cancelled pending confirmation
+        window.confirmDialog(
+            "LDAP Authentication is being enabled without a successful connection test in this session. If the server, service account, or admin groups are wrong, domain admins may not be able to sign in. Save anyway?",
+            () => { this.dataset.confirmed = 'true'; this.requestSubmit(); },
+            { confirmLabel: 'Save anyway' }
+        );
+    }
+});
 </script>
 {% endblock %}
 '''
@@ -1656,7 +1982,7 @@ MY_DEVICES_HTML = r"""
 {% if not devices %}
 <div class="card bg-base-100 border border-base-300 shadow-sm">
     <div class="card-body p-10 items-center text-center">
-        <i data-lucide="monitor-off" class="w-12 h-12 opacity-30 mb-3" aria-hidden="true"></i>
+        <i data-lucide="monitor-off" class="w-12 h-12 opacity-40 mb-3" aria-hidden="true"></i>
         <h2 class="font-semibold text-lg">No devices yet</h2>
         <p class="text-base-content/70 max-w-md">Sign in to your account in the RustDesk app on a device — it will appear here and in the address book of all your clients automatically.</p>
     </div>
@@ -1683,7 +2009,7 @@ MY_DEVICES_HTML = r"""
                     {% for d in devices %}
                     <tr class="hover">
                         <td>
-                            <span class="font-mono font-semibold text-primary tabular-nums">{{ d.id }}</span>
+                            <span class="font-mono font-semibold text-base-content tabular-nums">{{ d.id }}</span>
                             <button type="button" class="btn btn-ghost btn-xs btn-square js-copy-id" data-id="{{ d.id }}" title="Copy ID" aria-label="Copy device ID {{ d.id }}">
                                 <i data-lucide="copy" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             </button>
@@ -1691,7 +2017,7 @@ MY_DEVICES_HTML = r"""
                         <td>{{ d.hostname or '-' }}</td>
                         <td>{{ d.username or '-' }}</td>
                         <td>{{ d.os_short }}</td>
-                        <td><span class="tabular-nums">{{ d.ip or '-' }}</span></td>
+                        <td><span class="font-mono tabular-nums">{{ d.ip or '-' }}</span></td>
                         <td>
                             {% if d.password %}
                             <span class="font-mono text-sm text-base-content/70">••••••••</span>
@@ -1705,11 +2031,13 @@ MY_DEVICES_HTML = r"""
                                 <span class="w-1.5 h-1.5 rounded-full bg-success-content motion-safe:animate-pulse"></span>
                                 Online
                             </span>
+                            {% elif not d.last_seen_iso %}
+                            <span class="badge badge-outline text-xs font-semibold" title="This device has registered but never reported its status">Never seen</span>
                             {% else %}
                             <span class="badge badge-ghost text-xs font-semibold">Offline</span>
                             {% endif %}
                         </td>
-                        <td><span class="tabular-nums js-last-seen" data-ts="{{ d.last_seen_iso }}">-</span></td>
+                        <td data-order="{{ d.last_seen_iso }}"><span class="font-mono tabular-nums js-last-seen" data-ts="{{ d.last_seen_iso }}">-</span></td>
                         <td class="flex gap-1">
                             <button type="button" class="btn btn-primary btn-sm js-connect" data-id="{{ d.id }}" data-password="{{ d.password }}" title="Connect" aria-label="Connect to device {{ d.id }}">
                                 <i data-lucide="link" class="w-4 h-4 mr-1" aria-hidden="true"></i>Connect
@@ -1782,6 +2110,7 @@ const ID_SERVER = {{ id_server | tojson }};
 $(document).ready(function() {
     if ($.fn.DataTable && $('#myDevicesTable tbody tr').length) {
         window.initDataTable('#myDevicesTable', {
+            order: [[7, 'desc']],
             pageLength: 25,
             language: {
                 search: "Search:",
@@ -1849,10 +2178,14 @@ document.addEventListener('click', function(e) {
 
 document.addEventListener('submit', function(e) {
     const form = e.target.closest('.js-unclaim');
-    if (form) {
-        if (!confirm('Remove device “' + (form.dataset.hostname || '') + '” from your account?')) {
-            e.preventDefault();
-        }
+    if (form && form.dataset.confirmed !== 'true') {
+        e.preventDefault();
+        e.stopPropagation();
+        window.confirmDialog(
+            'Remove device "' + (form.dataset.hostname || '') + '" from your account?',
+            () => { form.dataset.confirmed = 'true'; form.requestSubmit(); },
+            { confirmLabel: 'Remove' }
+        );
     }
 });
 
@@ -2050,27 +2383,32 @@ def get_devices_list(search_query=None, user_id=None):
         else:
             device['os_short'] = os_full[:20] if os_full else '-'
         
-        # Format last seen
+        # Format last seen. last_seen_iso is the DataTables sort/filter key
+        # (data-order attribute) since last_seen_str's DD.MM.YYYY display
+        # format doesn't sort correctly as plain text across month/year
+        # boundaries.
         if device['last_seen']:
             try:
                 dt = datetime.fromisoformat(device['last_seen'])
                 device['last_seen_str'] = dt.strftime('%d.%m.%Y %H:%M')
+                device['last_seen_iso'] = dt.isoformat() + 'Z'
             except:
                 device['last_seen_str'] = str(device['last_seen'])
+                device['last_seen_iso'] = ''
         else:
             device['last_seen_str'] = 'Never'
+            device['last_seen_iso'] = ''
         devices_list.append(device)
     return devices_list
 
-@app.route('/dashboard')
-@web_login_required
-def web_dashboard():
+def compute_dashboard_data(is_admin, user_id):
+    """Compute KPI stats, 7-day connection series and OS distribution.
+
+    Shared by the full-page dashboard render and the /api/dashboard/stats
+    polling endpoint so the live refresh stays in lockstep with the SSR view.
+    Returns a dict of plain Python values (JSON-serializable).
+    """
     conn = get_db()
-    
-    is_admin = session.get('is_admin')
-    user_id = session.get('user_id')
-    
-    # Stats
     if is_admin:
         total = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
         online = conn.execute(
@@ -2088,8 +2426,8 @@ def web_dashboard():
             "SELECT COUNT(*) FROM connections WHERE device_id IN (SELECT id FROM devices WHERE user_id = ?) AND date(started_at) = date('now')",
             (user_id,)
         ).fetchone()[0]
-        users_count = total # For non-admins, show their total devices as secondary stat
-    
+        users_count = total  # For non-admins, show their total devices as secondary stat
+
     # Chart data - last 7 days
     chart_labels = []
     chart_data = []
@@ -2105,7 +2443,7 @@ def web_dashboard():
             ).fetchone()[0]
         chart_labels.append(label)
         chart_data.append(count)
-    
+
     # OS distribution
     os_stats = {}
     if is_admin:
@@ -2125,8 +2463,46 @@ def web_dashboard():
         else:
             key = 'Other'
         os_stats[key] = os_stats.get(key, 0) + 1
-    
+
     conn.close()
+    return {
+        'stats': {
+            'total': total,
+            'online': online,
+            'connections_today': connections_today,
+            'users': users_count,
+        },
+        'chart_labels': chart_labels,
+        'chart_data': chart_data,
+        'os_labels': list(os_stats.keys()),
+        'os_data': list(os_stats.values()),
+    }
+
+@app.route('/api/dashboard/stats')
+@web_login_required
+def api_dashboard_stats():
+    """Live dashboard data for in-place polling (no full-page reload)."""
+    data = compute_dashboard_data(session.get('is_admin'), session.get('user_id'))
+    data['device_online'] = {
+        d['id']: bool(d['online'])
+        for d in get_devices_list(user_id=None if session.get('is_admin') else session.get('user_id'))
+    }
+    return jsonify(data)
+
+@app.route('/dashboard')
+@web_login_required
+def web_dashboard():
+    is_admin = session.get('is_admin')
+    user_id = session.get('user_id')
+    data = compute_dashboard_data(is_admin, user_id)
+    total = data['stats']['total']
+    online = data['stats']['online']
+    connections_today = data['stats']['connections_today']
+    users_count = data['stats']['users']
+    chart_labels = data['chart_labels']
+    chart_data = data['chart_data']
+    os_stats_keys = data['os_labels']
+    os_stats_values = data['os_data']
     
     devices_list = get_devices_list(user_id=None if is_admin else user_id)
     
@@ -2140,10 +2516,13 @@ def web_dashboard():
             'users': users_count
         },
         devices=devices_list,
-        chart_labels=json.dumps(chart_labels),
-        chart_data=json.dumps(chart_data),
-        os_labels=json.dumps(list(os_stats.keys()) or ['No data']),
-        os_data=json.dumps(list(os_stats.values()) or [1])
+        # Raw Python lists — the template renders them with |tojson for the
+        # Chart.js <script> block AND uses them directly in {% if %}/{% for %}
+        # for the accessible data-table fallback and empty-state check.
+        chart_labels=chart_labels,
+        chart_data=chart_data,
+        os_labels=os_stats_keys,
+        os_data=os_stats_values
     )
 
 @app.route('/devices')
@@ -2261,11 +2640,11 @@ def web_save_ldap():
     
     for key, value in settings.items():
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
-    
+
     conn.commit()
     conn.close()
-    
-    return redirect(url_for('web_settings'))
+
+    return redirect(url_for('web_settings', saved='ldap'))
 
 @app.route('/settings/global', methods=['POST'])
 @admin_required
@@ -2285,12 +2664,12 @@ def web_save_global():
         'enable-audio': request.form.get('enable-audio', '')
     }
     
-    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", 
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
                  ('global_settings', json.dumps(global_settings)))
     conn.commit()
     conn.close()
-    
-    return redirect(url_for('web_settings'))
+
+    return redirect(url_for('web_settings', saved='global'))
 
 @app.route('/api/global-settings', methods=['GET'])
 def api_global_settings():

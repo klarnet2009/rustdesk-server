@@ -7,6 +7,80 @@
   html {
     @apply antialiased;
   }
+
+  /* Consistent, always-visible keyboard focus ring across every interactive
+     element (buttons, links, inputs, selects, checkboxes, dialogs). Uses
+     :focus-visible so mouse clicks don't show the ring but keyboard/AT
+     navigation always does. Critical a11y baseline — DaisyUI's per-component
+     focus styles were inconsistent across themes. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible,
+  summary:focus-visible,
+  .btn:focus-visible,
+  .checkbox:focus-visible,
+  .input:focus-visible,
+  .select:focus-visible {
+    outline: 2px solid oklch(var(--p));
+    outline-offset: 2px;
+    border-radius: 0.35rem;
+  }
+}
+
+@layer components {
+  /* Touch-target floor: on coarse pointers (touch/tablet) small icon-only
+     square buttons in dense tables were ~32px, below the 44px guideline.
+     Bump their hit area without changing the desktop-mouse look. */
+  @media (pointer: coarse) {
+    .btn-sm.btn-square,
+    .btn-xs.btn-square {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+  }
+
+  /* Toast entrance — subtle slide+fade; disabled under reduced-motion. */
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .toast-item {
+    animation: toast-in 0.2s ease-out;
+  }
+  /* Gentle page/card entrance for first paint. */
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(0.4rem); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .motion-safe\:rise-in {
+    animation: rise-in 0.28s ease-out both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toast-item,
+    .motion-safe\:rise-in {
+      animation: none;
+    }
+  }
+
+  /* Live-status dot for the real-time dashboard indicator. */
+  .live-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: oklch(var(--su));
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .live-dot.is-live {
+      animation: live-pulse 2s ease-in-out infinite;
+    }
+  }
+  @keyframes live-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
 }
 
 /* ==================== DataTables DaisyUI Mapping ==================== */
