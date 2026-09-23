@@ -160,3 +160,35 @@ def test_browser_sso_challenges_without_auth(app_module):
     resp = app_module.app.test_client().get('/login-sso')
     assert resp.status_code == 401
     assert resp.headers.get('WWW-Authenticate') == 'Negotiate'
+
+
+def _mock_sso_ok(app_module, monkeypatch):
+    import sso_kerberos as sk
+    monkeypatch.setattr(sk, 'SPNEGO_AVAILABLE', True, raising=False)
+    monkeypatch.setattr(sk, 'validate_negotiate_token', lambda t, spn: 'jdoe@EXAMPLE.LOCAL', raising=False)
+    monkeypatch.setattr(app_module, 'resolve_sso_user',
+                        lambda p: {'user_id': 7, 'username': 'jdoe', 'is_admin': False, 'email': 'jdoe@x'})
+
+
+def test_login_sso_assigns_device_to_user(app_module, monkeypatch):
+    _mock_sso_ok(app_module, monkeypatch)
+    resp = app_module.app.test_client().post(
+        '/api/login-sso', headers={'Authorization': 'Negotiate QQ=='},
+        json={'id': '123456789', 'uuid': 'dXVpZA=='})
+    assert resp.status_code == 200
+    conn = app_module.get_db()
+    row = conn.execute("SELECT user_id, uuid FROM devices WHERE id = ?", ('123456789',)).fetchone()
+    conn.close()
+    assert row is not None
+    assert row['user_id'] == 7
+    assert row['uuid'] == 'dXVpZA=='
+
+
+def test_login_sso_without_device_body_still_ok(app_module, monkeypatch):
+    _mock_sso_ok(app_module, monkeypatch)
+    resp = app_module.app.test_client().post('/api/login-sso', headers={'Authorization': 'Negotiate QQ=='})
+    assert resp.status_code == 200
+    conn = app_module.get_db()
+    n = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
+    conn.close()
+    assert n == 0

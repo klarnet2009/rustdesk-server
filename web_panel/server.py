@@ -2793,6 +2793,12 @@ def api_login_sso():
     u = resolve_sso_user(principal)
     if not u:
         return jsonify({'error': 'SSO principal collides with a local account'}), 403
+    data = request.get_json(silent=True) or {}
+    device_id = data.get('id', '')
+    if device_id:
+        conn = get_db()
+        assign_device_to_user(conn, device_id, data.get('uuid', ''), u['user_id'], u['username'])
+        conn.close()
     access_token = create_token(u['user_id'], u['username'], u['is_admin'])
     print(f"[SSO] client login OK: {u['username']} (admin={u['is_admin']})")
     return jsonify({
