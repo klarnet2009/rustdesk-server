@@ -172,6 +172,11 @@ def init_db():
         key TEXT PRIMARY KEY,
         value TEXT
     )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS used_same_account_tickets (
+        jti TEXT PRIMARY KEY,
+        exp REAL
+    )''')
     
     # Default admin
     try:
@@ -2915,7 +2920,99 @@ def api_resolve():
 @app.route('/api/logout', methods=['POST', 'OPTIONS'])
 @token_required
 def api_logout():
+    # Release the device so it stops counting as "same account" once the
+    # user signs out there.
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    data = request.get_json(silent=True) or {}
+    device_id = data.get('id', '')
+    if token and device_id:
+        try:
+            claims = jwt.decode(token, get_jwt_secret(), algorithms=["HS256"])
+        except Exception:
+            claims = None
+        if claims and claims.get('user_id'):
+            conn = get_db()
+            conn.execute("UPDATE devices SET user_id = NULL WHERE id = ? AND user_id = ?",
+                         (device_id, claims['user_id']))
+            conn.commit()
+            conn.close()
     return jsonify({"success": True})
+
+# ==================== SAME-ACCOUNT LOGIN ====================
+# The controlling client asks for a short-lived ticket bound to the target
+# device; the controlled side redeems it here. The server decides "same
+# account" from device ownership, so neither side ever hands its access
+# token to the other peer.
+
+SAME_ACCOUNT_TICKET_TTL = 120
+
+def _same_account_secret():
+    # Separate key: a ticket must never pass token_required, and an access
+    # token must never pass as a ticket.
+    return get_jwt_secret() + ':same-account'
+
+def _device_owner(conn, device_id):
+    row = conn.execute("SELECT user_id FROM devices WHERE id = ?", (device_id,)).fetchone()
+    return row['user_id'] if row else None
+
+@app.route('/api/same-account/ticket', methods=['POST', 'OPTIONS'])
+@token_required
+def api_same_account_ticket():
+    if request.method == 'OPTIONS':
+        return '', 200
+    target = (request.get_json(silent=True) or {}).get('id', '')
+    user_id = request.current_user['user_id']
+    conn = get_db()
+    owner = _device_owner(conn, target) if target else None
+    user = conn.execute("SELECT username, status FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    if not user or user['status'] != 1 or owner != user_id:
+        return jsonify({'error': 'Device is not linked to this account'}), 403
+    ticket = jwt.encode({
+        'typ': 'same-account',
+        'uid': user_id,
+        'username': user['username'],
+        'target': target,
+        'jti': secrets.token_hex(16),
+        'exp': time.time() + SAME_ACCOUNT_TICKET_TTL,
+    }, _same_account_secret(), algorithm="HS256")
+    return jsonify({'ticket': ticket})
+
+@app.route('/api/same-account/verify', methods=['POST', 'OPTIONS'])
+def api_same_account_verify():
+    if request.method == 'OPTIONS':
+        return '', 200
+    data = request.get_json(silent=True) or {}
+    device_id = data.get('id', '')
+    denied = lambda reason: (jsonify({'ok': False, 'error': reason}), 403)
+    try:
+        claims = jwt.decode(data.get('ticket', ''), _same_account_secret(), algorithms=["HS256"])
+    except Exception:
+        return denied('Invalid ticket')
+    now = time.time()
+    if claims.get('typ') != 'same-account' or claims.get('exp', 0) < now:
+        return denied('Invalid ticket')
+    if not device_id or claims.get('target') != device_id:
+        return denied('Ticket was issued for another device')
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM used_same_account_tickets WHERE exp < ?", (now,))
+        try:
+            conn.execute("INSERT INTO used_same_account_tickets (jti, exp) VALUES (?, ?)",
+                         (claims.get('jti', ''), claims['exp']))
+        except sqlite3.IntegrityError:
+            conn.commit()
+            return denied('Ticket already used')
+        user = conn.execute("SELECT username, status FROM users WHERE id = ?", (claims.get('uid'),)).fetchone()
+        if not user or user['status'] != 1 or _device_owner(conn, device_id) != claims.get('uid'):
+            conn.commit()
+            return denied('Device is not linked to this account')
+        audit_device_event(conn, device_id, 'same_account_login', {'username': user['username']})
+        conn.commit()
+    finally:
+        conn.close()
+    print(f"[SAME-ACCOUNT] {user['username']} -> {device_id}")
+    return jsonify({'ok': True, 'name': user['username']})
 
 @app.route('/api/currentUser', methods=['POST', 'OPTIONS'])
 @token_required
